@@ -24,7 +24,14 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git remote *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(xargs git grep -i -n \"key\\\\|secret\\\\|password\\\\|token\")",
+      "Bash(xargs git grep -i -n \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\\\|AIzaSy\\\\|AQ\\\\.Ab\")",
+      "Bash(grep \"backend/.env$\")",
+      "Bash(xargs git grep -l \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\\\|AIzaSy\\\\|AQ\\\\.Ab\")",
+      "Bash(grep -v \"\\\\.md$\")",
+      "Bash(xargs git grep -l \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\")",
+      "Bash(git submodule *)"
     ]
   }
 }
