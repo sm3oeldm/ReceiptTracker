@@ -1,0 +1,26 @@
+# Node.js
+node_modules/
+.env
+
+# Logs
+*.log
+
+# Environment files
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Build output
+build/
+dist/
+
+# Dependency directories
+bower_components/
+
+# Runtime data
+tmp/
+pids/
+*.pid
+*.seed
+*.pid.lock

@@ -1,0 +1,93 @@
+const express = require('express');
+const router = express.Router();
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+// Registration
+router.post('/register', async (req, res) => {
+  const { email, password, display_name } = req.body;
+
+  try {
+    // 1. Sign up user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: 'http://localhost:3000/auth/callback',
+      }
+    });
+
+    if (authError) {
+      console.log('Auth error details:', {
+        message: authError.message,
+        code: authError.code,
+        status: authError.status
+      });
+      // Handle rate limit error specifically
+      if (authError.code === 'over_email_send_rate_limit' || authError.message.includes('rate limit')) {
+        console.warn('Supabase email rate limit hit, trying alternative signup...');
+        // Try admin signup which doesn't send email
+        const adminClient = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_KEY
+        );
+
+        const { data: adminAuth, error: adminError } = await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true, // Skip email confirmation
+        });
+
+        if (adminError) throw adminError;
+        if (!adminAuth.user) throw new Error('User creation failed');
+
+        // Use the admin-created user
+        authData.user = adminAuth.user;
+      } else {
+        throw authError;
+      }
+    }
+
+    // 2. Insert profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert([{ id: authData.user.id, display_name }]);
+
+    if (profileError) throw profileError;
+
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(400).json({
+      error: error.message,
+      details: error.code || 'unknown_error',
+      status: error.status || 400
+    });
+  }
+});
+
+// Login
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+
+    res.json({ access_token: data.session.access_token });
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(400).json({
+      error: error.message,
+      details: error.code || 'unknown_error',
+      status: error.status || 400
+    });
+  }
+});
+
+module.exports = router;

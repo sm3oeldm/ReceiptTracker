@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node test_api.js)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(node *)",
+      "Bash(npx create-expo-app *)",
+      "Bash(npx expo *)",
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(npm info *)",
+      "Bash(taskkill *)",
+      "Bash(expo start *)",
+      "Bash(expo doctor *)",
+      "Bash(npx expo-doctor *)",
+      "Bash(pkill *)",
+      "Bash(npm list *)"
+    ]
+  }
+}

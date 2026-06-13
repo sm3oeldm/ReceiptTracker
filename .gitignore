@@ -1,0 +1,61 @@
+# Node.js
+node_modules/
+.env
+
+# Expo
+mobile/node_modules/
+mobile/.expo/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+
+# Environment files
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Build output
+build/
+dist/
+
+# Dependency directories
+bower_components/
+
+# Runtime data
+tmp/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS generated files
+Thumbs.db
+.eot
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database
+*.sqlite
+*.db
+
+# Coverage
+coverage/
+*.lcov
+
+# Expo
+.expo/
+
+# Android
+android/
+
+# iOS
+ios/
