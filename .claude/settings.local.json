@@ -31,7 +31,11 @@
       "Bash(xargs git grep -l \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\\\|AIzaSy\\\\|AQ\\\\.Ab\")",
       "Bash(grep -v \"\\\\.md$\")",
       "Bash(xargs git grep -l \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\")",
-      "Bash(git submodule *)"
+      "Bash(git submodule *)",
+      "Bash(npm uninstall *)",
+      "Bash(TaskStop bxbzvc0h6 *)",
+      "Bash(TaskStop boanuv8hb *)",
+      "Bash(npx eslint *)"
     ]
   }
 }
