@@ -19,7 +19,9 @@
       "Bash(pkill *)",
       "Bash(npm list *)",
       "PowerShell(Get-Process *)",
-      "PowerShell(Stop-Process *)"
+      "PowerShell(Stop-Process *)",
+      "Bash(awk '{print $9, $5}')",
+      "Bash(git add *)"
     ]
   }
 }
