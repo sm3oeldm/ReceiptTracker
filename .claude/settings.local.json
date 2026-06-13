@@ -17,7 +17,9 @@
       "Bash(expo doctor *)",
       "Bash(npx expo-doctor *)",
       "Bash(pkill *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)"
     ]
   }
 }

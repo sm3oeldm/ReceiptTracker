@@ -40,13 +40,28 @@ router.get('/:year/:month', authMiddleware, async (req, res) => {
     // Get all receipts for the group in this month
     const { data: receipts, error: receiptsError } = await supabase
       .from('receipts')
-      .select('*, profiles(display_name), categories(name, icon)')
+      .select('*, categories(name, icon)')
       .eq('group_id', profile.group_id)
       .gte('receipt_date', startDate)
       .lte('receipt_date', endDate)
       .order('receipt_date', { ascending: false });
 
     if (receiptsError) throw receiptsError;
+
+    // Fetch user display names for all unique user_ids in receipts
+    const userIds = [...new Set(receipts.map(r => r.user_id))];
+    const { data: users, error: usersError } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', userIds);
+
+    if (usersError) throw usersError;
+
+    // Create a map of user_id to display_name
+    const userDisplayNames = {};
+    users.forEach(user => {
+      userDisplayNames[user.id] = user.display_name;
+    });
 
     // Calculate summary statistics
     const totalSpent = receipts.reduce((sum, receipt) => sum + receipt.total, 0);
@@ -80,7 +95,7 @@ router.get('/:year/:month', authMiddleware, async (req, res) => {
     // Group by member
     const byMember = {};
     receipts.forEach(receipt => {
-      const memberName = receipt.profiles?.display_name || 'Unknown';
+      const memberName = userDisplayNames[receipt.user_id] || 'Unknown';
 
       if (!byMember[memberName]) {
         byMember[memberName] = {
@@ -150,7 +165,7 @@ router.get('/:year/:month', authMiddleware, async (req, res) => {
       total: receipt.total,
       date: receipt.receipt_date,
       category: receipt.categories?.name || 'Other',
-      member: receipt.profiles?.display_name || 'Unknown'
+      member: userDisplayNames[receipt.user_id] || 'Unknown'
     }));
 
     res.json({
@@ -209,13 +224,28 @@ router.get('/:year/:month/export/csv', authMiddleware, async (req, res) => {
     // Get all receipts for the group in this month
     const { data: receipts, error: receiptsError } = await supabase
       .from('receipts')
-      .select('*, profiles(display_name), categories(name)')
+      .select('*, categories(name)')
       .eq('group_id', profile.group_id)
       .gte('receipt_date', startDate)
       .lte('receipt_date', endDate)
       .order('receipt_date', { ascending: true });
 
     if (receiptsError) throw receiptsError;
+
+    // Fetch user display names for all unique user_ids in receipts
+    const userIds = [...new Set(receipts.map(r => r.user_id))];
+    const { data: users, error: usersError } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', userIds);
+
+    if (usersError) throw usersError;
+
+    // Create a map of user_id to display_name
+    const userDisplayNames = {};
+    users.forEach(user => {
+      userDisplayNames[user.id] = user.display_name;
+    });
 
     // Generate CSV content
     const csvHeader = 'Date,Merchant,Category,Total,Currency,Member,Notes\n';
@@ -225,7 +255,7 @@ router.get('/:year/:month/export/csv', authMiddleware, async (req, res) => {
       const category = receipt.categories?.name || 'Other';
       const total = receipt.total;
       const currency = receipt.currency || 'AED';
-      const member = receipt.profiles?.display_name || 'Unknown';
+      const member = userDisplayNames[receipt.user_id] || 'Unknown';
       const notes = receipt.notes ? receipt.notes.replace(/\+/g, ' ') : '';
 
       return `${date},"${merchant}","${category}",${total},${currency},"${member}","${notes}"`;

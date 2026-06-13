@@ -30,7 +30,7 @@ async function testAuth() {
       email: testUser.email,
       password: testUser.password
     });
-    authToken = loginResponse.data.access_token;
+    authToken = loginResponse.data.accessToken;
     console.log('✓ Login successful, got token');
 
   } catch (error) {

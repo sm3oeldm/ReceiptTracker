@@ -8,7 +8,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 // Generate a random 6-character invite code
 function generateInviteCode() {
-  return crypto.randomBytes(3).toString('uppercase').replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  return crypto.randomBytes(3).toString('hex').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 }
 
 // Create a new group
