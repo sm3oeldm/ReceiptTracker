@@ -38,6 +38,15 @@ pids/
 Thumbs.db
 .eot
 
+# Markdown files
+*.md
+!README.md
+
+# Claude config
+.claude/
+Thumbs.db
+.eot
+
 # Python
 __pycache__/
 *.py[cod]
