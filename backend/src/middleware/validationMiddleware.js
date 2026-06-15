@@ -1,5 +1,3 @@
-const { ValidationError } = require('express-validation');
-
 /**
  * Validation middleware to protect against oversized/malformed payloads
  */

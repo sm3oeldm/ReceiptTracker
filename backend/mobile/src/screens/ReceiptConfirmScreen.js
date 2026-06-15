@@ -69,6 +69,10 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
       Alert.alert('Missing Date', 'Please enter the receipt date.');
       return;
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+      Alert.alert('Invalid Date', 'Please use YYYY-MM-DD format (e.g. 2026-06-15)');
+      return;
+    }
     if (!selectedCategory) {
       Alert.alert('Missing Category', 'Please select a category for this receipt.');
       return;

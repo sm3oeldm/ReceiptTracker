@@ -72,10 +72,6 @@ app.use((req, res, next) => {
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
 // ==== Routes Import ====
 
 const authRoutes = require('./routes/auth')(supabase);
@@ -129,10 +125,7 @@ app.use((err, req, res, next) => {
 // ==== 404 Handler ====
 
 app.use((req, res) => {
-  res.status(404).json({
-    error: 'Not found',
-    message: `Endpoint ${req.method} ${req.path} not found`
-  });
+  res.status(404).json({ error: 'Not found' });
 });
 
 // ==== Start Server ====

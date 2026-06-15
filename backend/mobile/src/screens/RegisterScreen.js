@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useContext(AuthContext);
@@ -15,8 +16,18 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password should be at least 6 characters');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password should be at least 8 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
@@ -71,9 +82,22 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.label}>Password</Text>
           <TextInput
             style={styles.input}
-            placeholder="•••••••• (min 6 characters)"
+            placeholder="•••••••• (min 8 characters)"
             value={password}
             onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCompleteType="password"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Confirm Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
             secureTextEntry
             autoCapitalize="none"
             autoCompleteType="password"

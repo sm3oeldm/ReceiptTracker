@@ -8,8 +8,19 @@ const multer = require('multer');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Configure multer for in-memory storage (we don't save the image)
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure multer for in-memory storage with size and type limits
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type: ${file.mimetype}. Allowed: JPEG, PNG, WebP, HEIC`));
+    }
+  }
+});
 
 // Parse receipt image using Gemini
 router.post('/parse', authMiddleware, upload.single('image'), async (req, res) => {

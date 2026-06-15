@@ -14,6 +14,11 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const result = await signIn(email, password);
