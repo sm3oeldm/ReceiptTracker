@@ -12,9 +12,8 @@ const app = express();
 // Helmet with CSP and other security headers
 app.use(helmet({
   contentSecurityPolicy: {
-    useDefaults: true,
     directives: {
-      ...helmet.contentSecurityPolicy.defaults.directives,
+      defaultSrc: ["'self'"],
       imgSrc: ["'self'", "data:"],
       styleSrc: ["'self'", "'unsafe-inline'"],
     },
