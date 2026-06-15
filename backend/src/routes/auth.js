@@ -1,11 +1,12 @@
 // Clean auth route that accepts Supabase client as parameter
 const express = require('express');
+const { validateAuthInput } = require('../middleware/validationMiddleware');
 
 module.exports = (supabase) => {
   const router = express.Router();
 
   // REGISTER - Using admin API to bypass email rate limits
-  router.post('/register', async (req, res) => {
+  router.post('/register', validateAuthInput, async (req, res) => {
     const { email, password, display_name } = req.body;
 
     // Input validation
@@ -100,7 +101,7 @@ module.exports = (supabase) => {
   });
 
   // LOGIN
-  router.post('/login', async (req, res) => {
+  router.post('/login', validateAuthInput, async (req, res) => {
     const { email, password } = req.body;
 
     // Input validation

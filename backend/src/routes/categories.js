@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/authMiddleware');
+const { validateCategoryInput } = require('../middleware/validationMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
@@ -13,7 +14,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
-      .or(`is_default.eq.true,user_id.eq.${userId}`)
+      .or('is_default.eq.true,user_id.eq.' + userId)
       .order('name', { ascending: true });
 
     if (error) throw error;
@@ -25,7 +26,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Create a custom category
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, validateCategoryInput, async (req, res) => {
   const { name, icon } = req.body;
   const userId = req.user.id;
 

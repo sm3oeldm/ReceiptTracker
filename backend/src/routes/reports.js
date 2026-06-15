@@ -3,10 +3,27 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/authMiddleware');
 
+/**
+ * Validate year/month route params
+ */
+function validateReportParams(req, res, next) {
+  const year = parseInt(req.params.year);
+  const month = parseInt(req.params.month);
+
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return res.status(400).json({ error: 'Invalid year', message: 'Year must be between 2000 and 2100' });
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return res.status(400).json({ error: 'Invalid month', message: 'Month must be between 1 and 12' });
+  }
+
+  next();
+}
+
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 // Get monthly report
-router.get('/:year/:month', authMiddleware, async (req, res) => {
+router.get('/:year/:month', authMiddleware, validateReportParams, async (req, res) => {
   const userId = req.user.id;
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -190,7 +207,7 @@ router.get('/:year/:month', authMiddleware, async (req, res) => {
 });
 
 // Export CSV
-router.get('/:year/:month/export/csv', authMiddleware, async (req, res) => {
+router.get('/:year/:month/export/csv', authMiddleware, validateReportParams, async (req, res) => {
   const userId = req.user.id;
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -247,16 +264,26 @@ router.get('/:year/:month/export/csv', authMiddleware, async (req, res) => {
       userDisplayNames[user.id] = user.display_name;
     });
 
+    // Sanitize a field against CSV formula injection (leading = + - @ characters)
+    const sanitizeCsvField = (value) => {
+      if (!value) return '';
+      const str = String(value);
+      // Prefix with a single quote to prevent formula execution (Excel/Sheets will treat as text)
+      if (/^[=+\-@]/.test(str)) return "'" + str;
+      // Escape embedded quotes
+      return str.replace(/"/g, '""');
+    };
+
     // Generate CSV content
     const csvHeader = 'Date,Merchant,Category,Total,Currency,Member,Notes\n';
     const csvRows = receipts.map(receipt => {
       const date = receipt.receipt_date;
-      const merchant = receipt.merchant.replace(/\+/g, ' ');
-      const category = receipt.categories?.name || 'Other';
+      const merchant = sanitizeCsvField(receipt.merchant);
+      const category = sanitizeCsvField(receipt.categories?.name || 'Other');
       const total = receipt.total;
       const currency = receipt.currency || 'AED';
-      const member = userDisplayNames[receipt.user_id] || 'Unknown';
-      const notes = receipt.notes ? receipt.notes.replace(/\+/g, ' ') : '';
+      const member = sanitizeCsvField(userDisplayNames[receipt.user_id] || 'Unknown');
+      const notes = sanitizeCsvField(receipt.notes);
 
       return `${date},"${merchant}","${category}",${total},${currency},"${member}","${notes}"`;
     }).join('\n');

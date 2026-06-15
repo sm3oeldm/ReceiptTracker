@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const authMiddleware = require('../middleware/authMiddleware');
+const { validateReceiptInput, validateQueryParams } = require('../middleware/validationMiddleware');
 const multer = require('multer');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -68,10 +69,10 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
       }
       parsedData = JSON.parse(cleaned);
     } catch (parseError) {
+      console.error('Failed to parse Gemini response:', parseError.message);
       return res.status(422).json({
         error: 'Failed to parse receipt data',
-        details: 'The AI response could not be parsed as JSON',
-        rawResponse: responseText
+        details: 'The AI response could not be parsed as JSON'
       });
     }
 
@@ -98,7 +99,7 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
 });
 
 // Save a receipt
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, validateReceiptInput, async (req, res) => {
   const { merchant, total, currency, date, items, category_id, notes } = req.body;
   const userId = req.user.id;
 
@@ -138,7 +139,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // Get all receipts for the user
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, validateQueryParams, async (req, res) => {
   const userId = req.user.id;
   const { month, year, category_id } = req.query;
 
@@ -197,7 +198,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // Update a receipt
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authMiddleware, validateReceiptInput, async (req, res) => {
   const receiptId = req.params.id;
   const userId = req.user.id;
   const { merchant, total, currency, date, items, category_id, notes } = req.body;

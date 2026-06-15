@@ -3,9 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
 
 const app = express();
+
+// ==== Query Parser (limit depth to prevent parameter pollution) ====
+app.set('query parser', 'simple');
 
 // ==== Security Middleware ====
 
@@ -29,9 +31,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Body parsing with size limits
-app.use(express.json({ limit: '100kb' }));
-app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+// Body parsing with strict size limits
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: false, limit: '5kb' }));
+
+// ==== Global Input Sanitization (applied before all routes) ====
+const {
+  sanitizeInput,
+  validateJsonPayload,
+} = require('./middleware/validationMiddleware');
+
+app.use(sanitizeInput);
+app.use(validateJsonPayload);
 
 // ==== Rate Limiting ====
 
@@ -46,8 +57,10 @@ app.use('/api/', apiRateLimiter);
 
 // ==== Secret Validation ====
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GEMINI_API_KEY) {
-  console.error('❌ Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY');
+const requiredVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY'];
+const missing = requiredVars.filter(v => !process.env[v]);
+if (missing.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
   process.exit(1);
 }
 
@@ -108,12 +121,30 @@ app.get('/health', (req, res) => {
 
 // ==== Error Handling ====
 
+// Handle multer/upload errors (file too large, wrong type)
 app.use((err, req, res, next) => {
+  // Multer-specific errors
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      error: 'File too large',
+      message: 'Maximum file size is 5MB'
+    });
+  }
+  if (err.message && err.message.startsWith('Invalid file type')) {
+    return res.status(400).json({
+      error: 'Invalid file type',
+      message: err.message
+    });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: 'Payload too large',
+      message: 'Request body exceeds the size limit'
+    });
+  }
+  // Generic server error
   console.error('❌ Server error:', err.message);
-  // Omit stack trace in production to avoid information leakage
-  if (process.env.NODE_ENV !== 'development') {
-    // Do not log stack in production
-  } else {
+  if (process.env.NODE_ENV === 'development') {
     console.error(err.stack);
   }
   res.status(500).json({

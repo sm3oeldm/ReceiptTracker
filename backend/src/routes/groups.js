@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const authMiddleware = require('../middleware/authMiddleware');
+const { validateGroupInput } = require('../middleware/validationMiddleware');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
@@ -12,7 +13,7 @@ function generateInviteCode() {
 }
 
 // Create a new group
-router.post('/create', authMiddleware, async (req, res) => {
+router.post('/create', authMiddleware, validateGroupInput, async (req, res) => {
   const { name } = req.body;
   const userId = req.user.id;
 
@@ -65,7 +66,7 @@ router.post('/create', authMiddleware, async (req, res) => {
 });
 
 // Join a group
-router.post('/join', authMiddleware, async (req, res) => {
+router.post('/join', authMiddleware, validateGroupInput, async (req, res) => {
   const { inviteCode } = req.body;
   const userId = req.user.id;
 
