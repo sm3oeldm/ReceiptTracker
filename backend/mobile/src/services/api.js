@@ -106,3 +106,50 @@ export const getReport = async (year, month) => {
     throw new Error(error.message);
   }
 };
+
+// Send a receipt image to Gemini for AI parsing
+export const parseReceipt = async (imageUri) => {
+  let token;
+  try {
+    token = await SecureStore.getItemAsync('userToken');
+  } catch (e) {}
+
+  const formData = new FormData();
+  formData.append('image', {
+    uri: imageUri,
+    type: 'image/jpeg',
+    name: 'receipt.jpg',
+  });
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}receipts/parse`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error(error.message || 'Network error');
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    if (response.status === 401 && onAuthError) onAuthError();
+    throw new Error(data.error || data.details || 'Failed to parse receipt');
+  }
+
+  return data.data;
+};
+
+// Save a new receipt to the backend
+export const createReceipt = async (receiptData) => {
+  try {
+    return await authFetch('receipts', {
+      method: 'POST',
+      body: JSON.stringify(receiptData),
+    });
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};

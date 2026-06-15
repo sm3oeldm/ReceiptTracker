@@ -1,16 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-// import * as FileSystem from 'expo-file-system';
-// import * as Sharing from 'expo-sharing';
 
 export default function ScanScreen() {
+  const navigation = useNavigation();
   const [facing, setFacing] = useState('back');
   const [isScanning, setIsScanning] = useState(false);
   const cameraRef = useRef(null);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -18,12 +17,11 @@ export default function ScanScreen() {
     if (cameraRef.current && !isScanning) {
       try {
         setIsScanning(true);
-        let photo = await cameraRef.current.takePictureAsync();
+        const photo = await cameraRef.current.takePictureAsync();
         console.log('Photo taken:', photo.uri);
-        setCapturedPhoto(photo.uri);
+        navigation.navigate('ReceiptConfirm', { photoUri: photo.uri });
       } catch (error) {
         console.error('Error taking picture:', error);
-        Alert.alert('Error', 'Failed to capture receipt');
       } finally {
         setIsScanning(false);
       }
@@ -33,7 +31,7 @@ export default function ScanScreen() {
   const pickImage = async () => {
     try {
       setIsScanning(true);
-      let result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
@@ -42,57 +40,18 @@ export default function ScanScreen() {
 
       if (!result.canceled) {
         console.log('Image selected:', result.assets[0].uri);
-        setCapturedPhoto(result.assets[0].uri);
+        navigation.navigate('ReceiptConfirm', { photoUri: result.assets[0].uri });
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select receipt');
     } finally {
       setIsScanning(false);
     }
   };
 
-  const resetCapture = () => {
-    setCapturedPhoto(null);
-  };
-
-  const usePhoto = async () => {
-    if (!capturedPhoto) return;
-    Alert.alert(
-      'Receipt Captured',
-      'Photo saved. OCR processing will be available in the next update.',
-      [{ text: 'OK', onPress: resetCapture }]
-    );
-  };
-
   const toggleFacing = () => {
     setFacing(current => (current === 'back' ? 'front' : 'back'));
   };
-
-  // Show photo preview after capture
-  if (capturedPhoto) {
-    return (
-      <View style={styles.container}>
-        <Image source={{ uri: capturedPhoto }} style={styles.preview} />
-        <View style={styles.previewOverlay}>
-          <Text style={styles.previewTitle}>Receipt Captured</Text>
-        </View>
-        <View style={styles.previewActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={resetCapture}>
-            <Ionicons name="close" size={24} color="white" />
-            <Text style={styles.actionText}>Retake</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.useButton]}
-            onPress={usePhoto}
-          >
-            <Ionicons name="checkmark" size={24} color="white" />
-            <Text style={styles.actionText}>Use Photo</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
 
   // Still determining permission status
   if (!permission) {
@@ -183,53 +142,6 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  preview: {
-    flex: 1,
-    resizeMode: 'contain',
-  },
-  previewOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    paddingTop: 50,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  previewTitle: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  previewActions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 30,
-    paddingBottom: 50,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  useButton: {
-    backgroundColor: '#4CAF50',
-  },
-  actionText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
   },
   permissionPrompt: {
     flex: 1,

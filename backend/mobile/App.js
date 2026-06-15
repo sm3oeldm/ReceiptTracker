@@ -7,23 +7,25 @@ import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
-// Import screens (we'll create these next)
+// Screens
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import GroupScreen from './src/screens/GroupScreen';
+import ReceiptConfirmScreen from './src/screens/ReceiptConfirmScreen';
 
-const Stack = createNativeStackNavigator();
+const RootStack = createNativeStackNavigator();
+const AuthStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-    </Stack.Navigator>
+    <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+    </AuthStackNav.Navigator>
   );
 }
 
@@ -59,6 +61,19 @@ function AppTabs() {
   );
 }
 
+function MainNavigator() {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="HomeTabs" component={AppTabs} />
+      <RootStack.Screen
+        name="ReceiptConfirm"
+        component={ReceiptConfirmScreen}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+    </RootStack.Navigator>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -76,7 +91,7 @@ export default function App() {
           return (
             <NavigationContainer>
               <StatusBar style="auto" />
-              {isAuthenticated ? <AppTabs /> : <AuthStack />}
+              {isAuthenticated ? <MainNavigator /> : <AuthStack />}
             </NavigationContainer>
           );
         }}

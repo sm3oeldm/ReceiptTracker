@@ -74,20 +74,13 @@ export default function HomeScreen() {
     );
   }
 
-  // Auth error — session expired
+  // Auth error — session expired (auto-logout already triggered)
   if (error && (error.includes('Invalid or expired token') || error.includes('No token provided'))) {
     return (
       <View style={styles.centerContainer}>
         <Ionicons name="lock-closed" size={64} color="#ccc" />
         <Text style={styles.emptyTitle}>Session Expired</Text>
-        <Text style={styles.emptySubtext}>Please log in again to continue</Text>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Ionicons name="log-in" size={20} color="white" />
-          <Text style={styles.primaryButtonText}>Log In</Text>
-        </TouchableOpacity>
+        <Text style={styles.emptySubtext}>Please log in again</Text>
       </View>
     );
   }
