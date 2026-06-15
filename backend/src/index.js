@@ -1,81 +1,134 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 
 const app = express();
-app.use(cors({
-  origin: ['http://localhost:19006', 'http://localhost:19000', 'http://10.0.2.2:19006'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+
+// ==== Security Middleware ====
+
+// Helmet with CSP and other security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      ...helmet.contentSecurityPolicy.defaults.directives,
+      imgSrc: ["'self'", "data:"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    },
+  },
 }));
-app.use(express.json());
 
-// Rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    error: 'Too many requests, please try again later'
-  }
-});
-
-// Security headers middleware
+// Basic security headers (Referrer-Policy, X-Content-Type-Options, X-Frame-Options, X-XSS-Protection)
 app.use((req, res, next) => {
+  res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   next();
 });
 
-// Request logging middleware
+// Body parsing with size limits
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+// ==== Rate Limiting ====
+
+// Global rate limiter for all API routes
+const apiRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 150, // limit each IP to 150 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiRateLimiter);
+
+// ==== Secret Validation ====
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY || !process.env.GEMINI_API_KEY) {
+  console.error('❌ Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY');
+  process.exit(1);
+}
+
+// ==== CORS Configuration ====
+
+app.use(cors({
+  origin: ['http://localhost:19006', 'http://localhost:19000', 'http://10.0.2.2:19006'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// ==== Request Logging ====
+
 app.use((req, res, next) => {
   console.log(`📡 ${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
 
+// ==== Supabase & Gemini Initialization ====
 
-// Initialize Supabase
+const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-
-// Initialize Gemini
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-// Import routes
+// ==== Routes Import ====
+
 const authRoutes = require('./routes/auth')(supabase);
 const groupsRoutes = require('./routes/groups');
 const categoriesRoutes = require('./routes/categories');
 const receiptsRoutes = require('./routes/receipts');
 const reportsRoutes = require('./routes/reports');
 
-// Routes
+// ==== Apply Route Middleware ====
+
+// Auth-specific rate limiter (still keep for auth routes)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: {
+    success: false,
+    error: 'Too many requests, please try again later'
+  }
+});
+
+// ==== Define Routes ====
+
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/receipts', receiptsRoutes);
 app.use('/api/reports', reportsRoutes);
 
+// ==== Health Check ====
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Error handling middleware
+// ==== Error Handling ====
+
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.message);
-  console.error(err.stack);
-
+  // Omit stack trace in production to avoid information leakage
+  if (process.env.NODE_ENV !== 'development') {
+    // Do not log stack in production
+  } else {
+    console.error(err.stack);
+  }
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
 
-// 404 handler
+// ==== 404 Handler ====
+
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not found',
@@ -83,6 +136,7 @@ app.use((req, res) => {
   });
 });
 
+// ==== Start Server ====
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
