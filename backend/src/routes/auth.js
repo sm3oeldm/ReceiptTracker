@@ -33,6 +33,7 @@ module.exports = (supabase) => {
 
     try {
       console.log('📝 Registering user:', email);
+      const startTime = Date.now();
 
       // Use admin API which doesn't send emails
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -40,6 +41,8 @@ module.exports = (supabase) => {
         password: password,
         email_confirm: true, // Skip email confirmation to avoid rate limits
       });
+
+      console.log(`⏱️ Auth creation took ${Date.now() - startTime}ms`);
 
       if (authError) {
         console.error('❌ Admin user creation failed:', authError.message);
@@ -59,12 +62,14 @@ module.exports = (supabase) => {
       // since the trigger should have created it already
       try {
         console.log('ℹ️  Upserting profile...');
+        const profileStartTime = Date.now();
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .upsert([{ id: authData.user.id, display_name: display_name }], {
             onConflict: 'id'
           })
           .select();
+        console.log(`⏱️ Profile upsert took ${Date.now() - profileStartTime}ms`);
 
         if (profileError) {
           console.warn('⚠️  Profile upsert failed (might be RLS), skipping:', profileError.message);
