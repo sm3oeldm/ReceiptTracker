@@ -1,6 +1,12 @@
 import { API_BASE_URL } from './api.config';
 import * as SecureStore from 'expo-secure-store';
 
+// Auth error callback — gets called when token is invalid/expired
+let onAuthError = null;
+export function setOnAuthError(callback) {
+  onAuthError = callback;
+}
+
 // Helper: read auth token and make a fetch request
 async function authFetch(path, options = {}) {
   let token;
@@ -16,14 +22,23 @@ async function authFetch(path, options = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new Error(error.message || 'Network error');
+  }
 
   const data = await response.json();
 
   if (!response.ok) {
+    // Detect expired/invalid token and trigger logout
+    if (response.status === 401 && onAuthError) {
+      onAuthError();
+    }
     throw new Error(data.error || `Request failed with status ${response.status}`);
   }
 
@@ -35,7 +50,7 @@ export const getReceipts = async (month, year) => {
   try {
     return await authFetch(`receipts?month=${month}&year=${year}`);
   } catch (error) {
-    throw new Error(`Failed to fetch receipts: ${error.message}`);
+    throw new Error(error.message);
   }
 };
 
@@ -44,7 +59,7 @@ export const getCurrentGroup = async () => {
   try {
     return await authFetch('groups/me');
   } catch (error) {
-    throw new Error(`Failed to fetch current group: ${error.message}`);
+    throw new Error(error.message);
   }
 };
 
@@ -56,7 +71,7 @@ export const createGroup = async (groupName) => {
       body: JSON.stringify({ name: groupName }),
     });
   } catch (error) {
-    throw new Error(`Failed to create group: ${error.message}`);
+    throw new Error(error.message);
   }
 };
 
@@ -68,7 +83,7 @@ export const joinGroup = async (inviteCode) => {
       body: JSON.stringify({ invite_code: inviteCode }),
     });
   } catch (error) {
-    throw new Error(`Failed to join group: ${error.message}`);
+    throw new Error(error.message);
   }
 };
 
@@ -79,7 +94,7 @@ export const leaveGroup = async () => {
       method: 'POST',
     });
   } catch (error) {
-    throw new Error(`Failed to leave group: ${error.message}`);
+    throw new Error(error.message);
   }
 };
 
@@ -88,6 +103,6 @@ export const getReport = async (year, month) => {
   try {
     return await authFetch(`reports/${year}/${month}`);
   } catch (error) {
-    throw new Error(`Failed to fetch report: ${error.message}`);
+    throw new Error(error.message);
   }
 };

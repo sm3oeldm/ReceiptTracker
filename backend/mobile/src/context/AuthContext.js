@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '../services/api.config';
+import { setOnAuthError } from '../services/api';
 
 // Create Auth Context
 const AuthContext = createContext();
@@ -11,6 +12,11 @@ const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+
+  // Register auth error handler so api.js can auto-logout on 401
+  useEffect(() => {
+    setOnAuthError(logout);
+  }, []);
 
   // Check auth status on app load
   useEffect(() => {

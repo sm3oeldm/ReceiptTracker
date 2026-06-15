@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { getReceipts } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const [receipts, setReceipts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -14,16 +17,16 @@ export default function HomeScreen() {
   const loadReceipts = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const currentDate = new Date();
       const currentMonth = currentDate.getMonth() + 1;
       const currentYear = currentDate.getFullYear();
 
       const data = await getReceipts(currentMonth, currentYear);
       setReceipts(data);
-      setError(null);
     } catch (err) {
       console.error('Failed to load receipts:', err);
-      setError(err.message || 'Failed to load receipts');
+      setError(err.message);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -31,8 +34,10 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    loadReceipts();
-  }, []);
+    if (isFocused) {
+      loadReceipts();
+    }
+  }, [isFocused]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -69,6 +74,39 @@ export default function HomeScreen() {
     );
   }
 
+  // Auth error — session expired
+  if (error && (error.includes('Invalid or expired token') || error.includes('No token provided'))) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="lock-closed" size={64} color="#ccc" />
+        <Text style={styles.emptyTitle}>Session Expired</Text>
+        <Text style={styles.emptySubtext}>Please log in again to continue</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Ionicons name="log-in" size={20} color="white" />
+          <Text style={styles.primaryButtonText}>Log In</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Other errors (network, etc.)
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Ionicons name="cloud-offline" size={64} color="#ccc" />
+        <Text style={styles.emptyTitle}>Something went wrong</Text>
+        <Text style={styles.emptySubtext}>{error}</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={loadReceipts}>
+          <Ionicons name="refresh" size={20} color="white" />
+          <Text style={styles.primaryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -76,44 +114,44 @@ export default function HomeScreen() {
         <Text style={styles.headerSubtitle}>Your Recent Receipts</Text>
       </View>
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadReceipts}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+      {receipts.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Ionicons name="receipt-outline" size={80} color="#ddd" />
+          <Text style={styles.emptyTitle}>No receipts yet</Text>
+          <Text style={styles.emptySubtext}>You don't have any receipts this month. Start by scanning your first receipt!</Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => navigation.navigate('Scan')}
+          >
+            <Ionicons name="camera" size={20} color="white" />
+            <Text style={styles.primaryButtonText}>Take a Photo</Text>
           </TouchableOpacity>
         </View>
-      )}
-
-      {!error && (
-        <>
-          {receipts.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="receipt-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No receipts yet</Text>
-              <Text style={styles.emptySubtext}>Scan your first receipt to get started</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={receipts}
-              renderItem={renderReceiptItem}
-              keyExtractor={item => item.id}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor="#4CAF50"
-                />
-              }
-              contentContainerStyle={styles.listContent}
+      ) : (
+        <FlatList
+          data={receipts}
+          renderItem={renderReceiptItem}
+          keyExtractor={item => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#4CAF50"
             />
-          )}
-        </>
+          }
+          contentContainerStyle={styles.listContent}
+        />
       )}
 
-      <TouchableOpacity style={styles.fab}>
-        <Ionicons name="camera" size={28} color="white" />
-      </TouchableOpacity>
+      {/* FAB to quickly take a photo */}
+      {receipts.length > 0 && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate('Scan')}
+        >
+          <Ionicons name="camera" size={28} color="white" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -127,10 +165,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 15,
     color: '#666',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#f5f5f5',
   },
   header: {
     padding: 20,
@@ -145,47 +191,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: 'red',
-    fontSize: 16,
-    marginBottom: 20,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
     textAlign: 'center',
   },
-  retryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 15,
-  },
   emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 22,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   listContent: {
     padding: 20,
-    paddingBottom: 80, // Space for FAB
+    paddingBottom: 80,
   },
   receiptItem: {
     backgroundColor: 'white',

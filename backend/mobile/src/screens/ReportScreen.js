@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { getReport } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { BarChart } from 'react-native-chart-kit';
 
 export default function ReportScreen() {
+  const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,13 +61,23 @@ export default function ReportScreen() {
   }
 
   if (error) {
+    const isAuthError = error.includes('Invalid or expired token') || error.includes('No token provided');
     return (
       <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={48} color="red" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadReport}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <Ionicons name={isAuthError ? 'lock-closed' : 'alert-circle'} size={48} color={isAuthError ? '#888' : 'red'} />
+        <Text style={styles.errorTitle}>{isAuthError ? 'Session Expired' : 'Something went wrong'}</Text>
+        <Text style={styles.errorText}>{isAuthError ? 'Please log in again to continue' : error}</Text>
+        {isAuthError ? (
+          <TouchableOpacity style={styles.retryButton} onPress={() => navigation.navigate('Login')}>
+            <Ionicons name="log-in" size={18} color="white" />
+            <Text style={styles.retryButtonText}>  Log In</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.retryButton} onPress={loadReport}>
+            <Ionicons name="refresh" size={18} color="white" />
+            <Text style={styles.retryButtonText}>  Try Again</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -72,9 +85,16 @@ export default function ReportScreen() {
   if (!report) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="stats-chart-outline" size={64} color="#ccc" />
-        <Text style={styles.emptyText}>No data available</Text>
+        <Ionicons name="stats-chart-outline" size={80} color="#ddd" />
+        <Text style={styles.emptyTitle}>No data available</Text>
         <Text style={styles.emptySubtext}>Start adding receipts to see your spending reports</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => navigation.navigate('Scan')}
+        >
+          <Ionicons name="camera" size={20} color="white" />
+          <Text style={styles.primaryButtonText}>Take a Photo</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -200,17 +220,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 15,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
   errorText: {
     color: 'red',
     fontSize: 16,
-    margin: 20,
+    marginBottom: 20,
     textAlign: 'center',
   },
   retryButton: {
+    flexDirection: 'row',
     backgroundColor: '#4CAF50',
     padding: 12,
     borderRadius: 8,
     paddingHorizontal: 24,
+    alignItems: 'center',
   },
   retryButtonText: {
     color: 'white',
@@ -220,18 +250,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 30,
   },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 15,
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    fontSize: 16,
+    color: '#888',
     textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 22,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   header: {
     flexDirection: 'row',
