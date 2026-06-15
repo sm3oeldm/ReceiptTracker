@@ -103,8 +103,16 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>This Month</Text>
-        <Text style={styles.headerSubtitle}>Your Recent Receipts</Text>
+        <View>
+          <Text style={styles.headerTitle}>This Month</Text>
+          <Text style={styles.headerSubtitle}>Your Recent Receipts</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          <Ionicons name="settings-outline" size={24} color="#666" />
+        </TouchableOpacity>
       </View>
 
       {receipts.length === 0 ? (
@@ -172,8 +180,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingTop: 60,
+    paddingHorizontal: 20,
     paddingBottom: 10,
+  },
+  settingsButton: {
+    padding: 4,
+    marginTop: 2,
   },
   headerTitle: {
     fontSize: 24,
