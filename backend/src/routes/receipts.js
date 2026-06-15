@@ -64,11 +64,11 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
       });
     }
 
-    // Validate the parsed data
-    if (!parsedData.merchant || !parsedData.total || !parsedData.date) {
+    // Validate only total is required — user can fill in the rest
+    if (!parsedData.total && parsedData.total !== 0) {
       return res.status(422).json({
         error: 'Incomplete receipt data',
-        details: 'Missing required fields in parsed data',
+        details: 'Could not determine the total amount',
         parsedData
       });
     }
