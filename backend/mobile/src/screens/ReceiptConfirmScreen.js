@@ -84,7 +84,7 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
         category_id: selectedCategory,
       });
       Alert.alert('Saved!', 'Receipt has been saved successfully.', [
-        { text: 'OK', onPress: () => navigation.navigate('HomeTabs') },
+        { text: 'OK', onPress: () => navigation.navigate('HomeTabs', { screen: 'Home' }) },
       ]);
     } catch (err) {
       console.error('Save error:', err);
