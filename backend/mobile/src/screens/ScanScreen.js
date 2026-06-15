@@ -1,29 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Camera, CameraType } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ScanScreen() {
-  const [hasPermission, setHasPermission] = useState(null);
-  const [cameraRef, setCameraRef] = useState(null);
-  const [type, setType] = useState(CameraType.back);
+  const [facing, setFacing] = useState('back');
   const [isScanning, setIsScanning] = useState(false);
+  const cameraRef = useRef(null);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const takePicture = async () => {
-    if (cameraRef && !isScanning) {
+    if (cameraRef.current && !isScanning) {
       try {
         setIsScanning(true);
-        let photo = await cameraRef.takePictureAsync();
+        let photo = await cameraRef.current.takePictureAsync();
         console.log('Photo taken:', photo.uri);
-        // In a real app, you would navigate to a confirmation screen
         Alert.alert('Success', 'Receipt captured! (Implementation coming soon)');
       } catch (error) {
         console.error('Error taking picture:', error);
@@ -56,74 +49,84 @@ export default function ScanScreen() {
     }
   };
 
-  if (hasPermission === null) {
+  const toggleFacing = () => {
+    setFacing(current => (current === 'back' ? 'front' : 'back'));
+  };
+
+  // Still determining permission status
+  if (!permission) {
     return <View style={styles.container} />;
   }
-  if (hasPermission === false) {
+
+  // Permission not granted yet — show request screen
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noPermissionText}>No access to camera</Text>
-        <TouchableOpacity style={styles.button} onPress={pickImage}>
-          <Text style={styles.buttonText}>Pick from Gallery</Text>
-        </TouchableOpacity>
+        <View style={styles.permissionPrompt}>
+          <Ionicons name="camera" size={64} color="#666" />
+          <Text style={styles.permissionTitle}>Camera Access Needed</Text>
+          <Text style={styles.permissionText}>
+            Allow camera access to scan receipts. Your photos won't be shared without your permission.
+          </Text>
+          <TouchableOpacity style={styles.button} onPress={requestPermission}>
+            <Text style={styles.buttonText}>Grant Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.galleryLink} onPress={pickImage}>
+            <Text style={styles.galleryLinkText}>Or pick from gallery</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Camera
+      <CameraView
         style={styles.camera}
-        type={type}
-        ref={ref => setCameraRef(ref)}
-        ratio="4:3"
-      >
-        <View style={styles.cameraOverlay}>
-          <View style={styles.cameraHeader}>
-            <Text style={styles.cameraTitle}>Scan Receipt</Text>
-            <TouchableOpacity
-              style={styles.flipButton}
-              onPress={() => {
-                setType(
-                  type === CameraType.back
-                    ? CameraType.front
-                    : CameraType.back
-                );
-              }}
-            >
-              <Ionicons name="camera-reverse" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
+        facing={facing}
+        ref={cameraRef}
+      />
 
-          <View style={styles.cameraFrame}>
-            <View style={styles.cornerTopLeft} />
-            <View style={styles.cornerTopRight} />
-            <View style={styles.cornerBottomLeft} />
-            <View style={styles.cornerBottomRight} />
-          </View>
-
-          <View style={styles.cameraControls}>
-            <TouchableOpacity style={styles.galleryButton} onPress={pickImage} disabled={isScanning}>
-              <Ionicons name="images" size={28} color="white" />
-              <Text style={styles.galleryText}>Gallery</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={takePicture}
-              disabled={isScanning}
-            >
-              {isScanning ? (
-                <ActivityIndicator size="large" color="white" />
-              ) : (
-                <View style={styles.captureButtonInner} />
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.placeholderButton} />
-          </View>
+      {/* Overlay UI rendered on top of CameraView, not inside it */}
+      <View style={styles.overlay} pointerEvents="box-none">
+        <View style={styles.cameraHeader}>
+          <Text style={styles.cameraTitle}>Scan Receipt</Text>
+          <TouchableOpacity
+            style={styles.flipButton}
+            onPress={toggleFacing}
+          >
+            <Ionicons name="camera-reverse" size={24} color="white" />
+          </TouchableOpacity>
         </View>
-      </Camera>
+
+        <View style={styles.cameraFrame}>
+          <View style={styles.cornerTopLeft} />
+          <View style={styles.cornerTopRight} />
+          <View style={styles.cornerBottomLeft} />
+          <View style={styles.cornerBottomRight} />
+        </View>
+
+        <View style={styles.cameraControls}>
+          <TouchableOpacity style={styles.galleryButton} onPress={pickImage} disabled={isScanning}>
+            <Ionicons name="images" size={28} color="white" />
+            <Text style={styles.galleryText}>Gallery</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={takePicture}
+            disabled={isScanning}
+          >
+            {isScanning ? (
+              <ActivityIndicator size="large" color="white" />
+            ) : (
+              <View style={styles.captureButtonInner} />
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.placeholderButton} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -131,13 +134,35 @@ export default function ScanScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
   camera: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
   },
-  cameraOverlay: {
+  overlay: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  permissionPrompt: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#f5f5f5',
+  },
+  permissionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  permissionText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 22,
   },
   cameraHeader: {
     flexDirection: 'row',
@@ -250,6 +275,14 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
+  },
+  galleryLink: {
+    marginTop: 10,
+  },
+  galleryLinkText: {
+    color: '#4CAF50',
+    fontSize: 16,
   },
 });
