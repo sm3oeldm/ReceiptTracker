@@ -5,7 +5,6 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import * as Application from 'expo-application';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -69,7 +68,7 @@ export default function ProfileScreen() {
       {/* App Info */}
       <View style={styles.appInfo}>
         <Text style={styles.appInfoText}>
-          Receipt Tracker v{Application.nativeApplicationVersion || '1.0.0'}
+          Receipt Tracker v1.0.0
         </Text>
       </View>
     </View>
