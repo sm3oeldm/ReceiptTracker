@@ -98,6 +98,15 @@ export const leaveGroup = async () => {
   }
 };
 
+// GET all available categories
+export const getCategories = async () => {
+  try {
+    return await authFetch('categories');
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
 // GET report data
 export const getReport = async (year, month) => {
   try {

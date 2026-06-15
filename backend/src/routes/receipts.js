@@ -23,7 +23,7 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
     const mimeType = req.file.mimetype;
 
     // Get the Gemini model
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Prepare the prompt
     const prompt = `You are a receipt parser. Extract the following from the receipt image and return ONLY valid JSON with no markdown, no explanation:

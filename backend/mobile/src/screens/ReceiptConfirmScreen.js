@@ -4,7 +4,7 @@ import {
   TextInput, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { parseReceipt, createReceipt } from '../services/api';
+import { parseReceipt, createReceipt, getCategories } from '../services/api';
 
 export default function ReceiptConfirmScreen({ route, navigation }) {
   const { photoUri } = route.params;
@@ -17,10 +17,26 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
   const [total, setTotal] = useState('');
   const [date, setDate] = useState('');
   const [currency, setCurrency] = useState('AED');
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   useEffect(() => {
+    loadCategories();
     parseImage();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await getCategories();
+      setCategories(data);
+      // Auto-select the first default category if available
+      if (data && data.length > 0) {
+        setSelectedCategory(data[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
 
   const parseImage = async () => {
     try {
@@ -53,6 +69,10 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
       Alert.alert('Missing Date', 'Please enter the receipt date.');
       return;
     }
+    if (!selectedCategory) {
+      Alert.alert('Missing Category', 'Please select a category for this receipt.');
+      return;
+    }
 
     try {
       setIsSaving(true);
@@ -61,6 +81,7 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
         total: parseFloat(total),
         currency: currency || 'AED',
         date: date.trim(),
+        category_id: selectedCategory,
       });
       Alert.alert('Saved!', 'Receipt has been saved successfully.', [
         { text: 'OK', onPress: () => navigation.navigate('HomeTabs') },
@@ -71,6 +92,12 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const getSelectedCategoryName = () => {
+    if (!selectedCategory) return null;
+    const cat = categories.find(c => c.id === selectedCategory);
+    return cat ? `${cat.icon || ''} ${cat.name}`.trim() : 'Select category';
   };
 
   // Parsing in progress
@@ -151,6 +178,47 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
             onChangeText={setDate}
             placeholder="YYYY-MM-DD"
           />
+
+          {/* Category selector */}
+          <Text style={styles.label}>Category</Text>
+          {categories.length > 0 ? (
+            <View style={styles.categoryContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryList}
+              >
+                {categories.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.categoryChip,
+                      selectedCategory === cat.id && styles.categoryChipSelected,
+                    ]}
+                    onPress={() => setSelectedCategory(cat.id)}
+                  >
+                    <Text style={styles.categoryIcon}>{cat.icon || '📦'}</Text>
+                    <Text
+                      style={[
+                        styles.categoryName,
+                        selectedCategory === cat.id && styles.categoryNameSelected,
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.categoryPlaceholder}
+              onPress={loadCategories}
+            >
+              <Ionicons name="refresh" size={18} color="#4CAF50" />
+              <Text style={styles.categoryPlaceholderText}>  Load categories</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Action buttons */}
@@ -288,6 +356,57 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     flex: 1,
+  },
+  // Category styles
+  categoryContainer: {
+    marginTop: 4,
+  },
+  categoryList: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#ddd',
+    backgroundColor: '#fafafa',
+    gap: 4,
+  },
+  categoryChipSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  categoryIcon: {
+    fontSize: 16,
+  },
+  categoryName: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#555',
+  },
+  categoryNameSelected: {
+    color: '#2E7D32',
+    fontWeight: '700',
+  },
+  categoryPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  categoryPlaceholderText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '500',
   },
   actions: {
     flexDirection: 'row',
