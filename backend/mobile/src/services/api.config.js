@@ -1,16 +1,8 @@
 // API Configuration
-// =================
-// This file controls how the mobile app connects to the backend server.
-//
-// Platform defaults:
-//   Android emulator → 10.0.2.2  (maps to host machine's localhost)
-//   iOS simulator    → localhost  (runs on the same Mac)
-//   Physical device  → use your computer's LAN IP (e.g. 192.168.x.x)
-//
-// If you see "Network Error" on every screen, the app can't reach the backend.
-// Most common fix: replace the host below with your computer's network IP.
-//
-//   Example: const DEV_API_HOST = '192.168.1.50';
+// Update this URL to match your backend server address.
+// Android emulator: use 10.0.2.2 (maps to host localhost)
+// iOS simulator: use 127.0.0.1 or your LAN IP
+// Physical device: use your machine's local IP address (e.g. 192.168.x.x)
 //
 // Backend must be running: cd ../backend && npm run dev
 
@@ -18,8 +10,8 @@ import { Platform } from 'react-native';
 
 const DEV_API_HOST = Platform.select({
   android: '10.0.2.2',
-  ios: 'localhost',
-  default: 'localhost',
+  ios: '192.168.0.130',
+  default: '192.168.0.130',
 });
 const API_PORT = '3000';
 
