@@ -44,11 +44,18 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
     ]);
 
     const responseText = result.response.text();
+    console.log('Gemini raw response:', responseText.substring(0, 500));
 
-    // Try to parse the JSON response
+    // Try to parse the JSON response (handle markdown-wrapped JSON)
     let parsedData;
     try {
-      parsedData = JSON.parse(responseText);
+      // Strip markdown code blocks if present
+      let cleaned = responseText.trim();
+      const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[1].trim();
+      }
+      parsedData = JSON.parse(cleaned);
     } catch (parseError) {
       return res.status(422).json({
         error: 'Failed to parse receipt data',
