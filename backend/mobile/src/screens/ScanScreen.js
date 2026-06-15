@@ -1,15 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ScanScreen() {
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const [facing, setFacing] = useState('back');
   const [isScanning, setIsScanning] = useState(false);
+  const [photoTaken, setPhotoTaken] = useState(false);
   const cameraRef = useRef(null);
+
+  useEffect(() => {
+    if (isFocused) {
+      setPhotoTaken(false);
+    }
+  }, [isFocused]);
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -17,11 +25,13 @@ export default function ScanScreen() {
     if (cameraRef.current && !isScanning) {
       try {
         setIsScanning(true);
+        setPhotoTaken(true);
         const photo = await cameraRef.current.takePictureAsync();
         console.log('Photo taken:', photo.uri);
         navigation.navigate('ReceiptConfirm', { photoUri: photo.uri });
       } catch (error) {
         console.error('Error taking picture:', error);
+        setPhotoTaken(false);
       } finally {
         setIsScanning(false);
       }
@@ -39,6 +49,7 @@ export default function ScanScreen() {
       });
 
       if (!result.canceled) {
+        setPhotoTaken(true);
         console.log('Image selected:', result.assets[0].uri);
         navigation.navigate('ReceiptConfirm', { photoUri: result.assets[0].uri });
       }
@@ -81,11 +92,15 @@ export default function ScanScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing={facing}
-        ref={cameraRef}
-      />
+      {photoTaken ? (
+        <View style={styles.cameraCover} />
+      ) : (
+        <CameraView
+          style={styles.camera}
+          facing={facing}
+          ref={cameraRef}
+        />
+      )}
 
       {/* Overlay UI rendered on top of CameraView, not inside it */}
       <View style={styles.overlay} pointerEvents="box-none">
@@ -138,6 +153,10 @@ const styles = StyleSheet.create({
   },
   camera: {
     ...StyleSheet.absoluteFillObject,
+  },
+  cameraCover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
   },
   overlay: {
     flex: 1,
