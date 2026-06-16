@@ -90,7 +90,7 @@ module.exports = (supabase) => {
         user: {
           id: authData.user.id,
           email: authData.user.email,
-          displayName: display_name
+          display_name: display_name
         }
       });
     } catch (error) {
@@ -137,13 +137,28 @@ module.exports = (supabase) => {
       }
 
       console.log('✅ Login successful');
+
+      // Fetch display_name from profiles
+      let displayName = null;
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', data.user.id)
+          .single();
+        if (profile) displayName = profile.display_name;
+      } catch (profileErr) {
+        console.warn('⚠️ Could not fetch display_name on login:', profileErr.message);
+      }
+
       res.json({
         success: true,
         accessToken: data.session.access_token,
         expiresIn: data.session.expires_in,
         user: {
           id: data.user.id,
-          email: data.user.email
+          email: data.user.email,
+          display_name: displayName
         }
       });
 

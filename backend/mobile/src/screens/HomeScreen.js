@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { getReceipts } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import ReceiptCard from '../components/ReceiptCard';
 
@@ -57,6 +58,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const { user } = useContext(AuthContext);
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const loadReceipts = async () => {
     try {
@@ -100,38 +103,38 @@ export default function HomeScreen() {
   );
 
   const renderHeader = () => (
-    <View style={styles.dashboardContainer}>
-      <View style={styles.dashboardHeader}>
-        <Ionicons name="shield-checkmark" size={18} color="#4CAF50" />
-        <Text style={styles.dashboardTitle}>Warranties & Returns</Text>
+    <View style={s.dashboardContainer}>
+      <View style={s.dashboardHeader}>
+        <Ionicons name="shield-checkmark" size={18} color={colors.accent} />
+        <Text style={s.dashboardTitle}>Warranties & Returns</Text>
       </View>
 
       {!hasAny ? (
-        <View style={styles.noneRow}>
-          <Ionicons name="checkmark-circle" size={16} color="#aaa" />
-          <Text style={styles.noneText}>None</Text>
+        <View style={s.noneRow}>
+          <Ionicons name="checkmark-circle" size={16} color={colors.textMuted} />
+          <Text style={s.noneText}>None</Text>
         </View>
       ) : (
         <>
           {expiringReturns.length > 0 && (
-            <View style={styles.dashboardSection}>
-              <Text style={styles.dashboardSectionTitle}>
+            <View style={s.dashboardSection}>
+              <Text style={s.dashboardSectionTitle}>
                 <Ionicons name="refresh" size={13} color="#e67e22" /> Returns Expiring Soon
               </Text>
               {expiringReturns.map(item => {
                 const badge = getBadge(item._daysLeft);
                 return (
-                  <View key={item.id} style={styles.dashboardItem}>
-                    <View style={styles.dashboardItemLeft}>
-                      <Text style={styles.dashboardItemMerchant} numberOfLines={1}>
+                  <View key={item.id} style={s.dashboardItem}>
+                    <View style={s.dashboardItemLeft}>
+                      <Text style={s.dashboardItemMerchant} numberOfLines={1}>
                         {item.merchant}
                       </Text>
-                      <Text style={styles.dashboardItemDate}>
+                      <Text style={s.dashboardItemDate}>
                         Expires {item.return_expiry_date}
                       </Text>
                     </View>
-                    <View style={[styles.dashboardBadge, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.dashboardBadgeText, { color: badge.color }]}>
+                    <View style={[s.dashboardBadge, { backgroundColor: badge.bg }]}>
+                      <Text style={[s.dashboardBadgeText, { color: badge.color }]}>
                         {badge.label}
                       </Text>
                     </View>
@@ -142,24 +145,24 @@ export default function HomeScreen() {
           )}
 
           {expiringWarranties.length > 0 && (
-            <View style={styles.dashboardSection}>
-              <Text style={styles.dashboardSectionTitle}>
-                <Ionicons name="shield" size={13} color="#4CAF50" /> Warranties Expiring Soon
+            <View style={s.dashboardSection}>
+              <Text style={s.dashboardSectionTitle}>
+                <Ionicons name="shield" size={13} color={colors.accent} /> Warranties Expiring Soon
               </Text>
               {expiringWarranties.map(item => {
                 const badge = getBadge(item._daysLeft);
                 return (
-                  <View key={item.id} style={styles.dashboardItem}>
-                    <View style={styles.dashboardItemLeft}>
-                      <Text style={styles.dashboardItemMerchant} numberOfLines={1}>
+                  <View key={item.id} style={s.dashboardItem}>
+                    <View style={s.dashboardItemLeft}>
+                      <Text style={s.dashboardItemMerchant} numberOfLines={1}>
                         {item.merchant}
                       </Text>
-                      <Text style={styles.dashboardItemDate}>
+                      <Text style={s.dashboardItemDate}>
                         Expires {item.warranty_expiry_date}
                       </Text>
                     </View>
-                    <View style={[styles.dashboardBadge, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.dashboardBadgeText, { color: badge.color }]}>
+                    <View style={[s.dashboardBadge, { backgroundColor: badge.bg }]}>
+                      <Text style={[s.dashboardBadgeText, { color: badge.color }]}>
                         {badge.label}
                       </Text>
                     </View>
@@ -171,15 +174,15 @@ export default function HomeScreen() {
         </>
       )}
 
-      <View style={styles.dashboardDivider} />
+      <View style={s.dashboardDivider} />
     </View>
   );
 
   if (isLoading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading your receipts...</Text>
+      <View style={s.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={s.loadingText}>Loading your receipts...</Text>
       </View>
     );
   }
@@ -187,10 +190,10 @@ export default function HomeScreen() {
   // Auth error — session expired (auto-logout already triggered)
   if (error && (error.includes('Invalid or expired token') || error.includes('No token provided'))) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="lock-closed" size={64} color="#ccc" />
-        <Text style={styles.emptyTitle}>Session Expired</Text>
-        <Text style={styles.emptySubtext}>Please log in again</Text>
+      <View style={s.centerContainer}>
+        <Ionicons name="lock-closed" size={64} color={colors.textMuted} />
+        <Text style={s.emptyTitle}>Session Expired</Text>
+        <Text style={s.emptySubtext}>Please log in again</Text>
       </View>
     );
   }
@@ -198,44 +201,44 @@ export default function HomeScreen() {
   // Other errors (network, etc.)
   if (error) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="cloud-offline" size={64} color="#ccc" />
-        <Text style={styles.emptyTitle}>Something went wrong</Text>
-        <Text style={styles.emptySubtext}>{error}</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={loadReceipts}>
+      <View style={s.centerContainer}>
+        <Ionicons name="cloud-offline" size={64} color={colors.textMuted} />
+        <Text style={s.emptyTitle}>Something went wrong</Text>
+        <Text style={s.emptySubtext}>{error}</Text>
+        <TouchableOpacity style={s.primaryButton} onPress={loadReceipts}>
           <Ionicons name="refresh" size={20} color="white" />
-          <Text style={styles.primaryButtonText}>Try Again</Text>
+          <Text style={s.primaryButtonText}>Try Again</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={s.container}>
+      <View style={s.header}>
         <View>
-          <Text style={styles.headerTitle}>This Month</Text>
-          <Text style={styles.headerSubtitle}>Your Recent Receipts</Text>
+          <Text style={s.headerTitle}>This Month</Text>
+          <Text style={s.headerSubtitle}>Your Recent Receipts</Text>
         </View>
         <TouchableOpacity
-          style={styles.settingsButton}
+          style={s.settingsButton}
           onPress={() => navigation.navigate('Profile')}
         >
-          <Ionicons name="settings-outline" size={24} color="#666" />
+          <Ionicons name="settings-outline" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {receipts.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <Ionicons name="receipt-outline" size={80} color="#ddd" />
-          <Text style={styles.emptyTitle}>No receipts yet</Text>
-          <Text style={styles.emptySubtext}>You don't have any receipts this month. Start by scanning your first receipt!</Text>
+        <View style={s.centerContainer}>
+          <Ionicons name="receipt-outline" size={80} color={colors.textMuted} />
+          <Text style={s.emptyTitle}>No receipts yet</Text>
+          <Text style={s.emptySubtext}>You don't have any receipts this month. Start by scanning your first receipt!</Text>
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={s.primaryButton}
             onPress={() => navigation.navigate('Scan')}
           >
             <Ionicons name="camera" size={20} color="white" />
-            <Text style={styles.primaryButtonText}>Take a Photo</Text>
+            <Text style={s.primaryButtonText}>Take a Photo</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -248,17 +251,17 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#4CAF50"
+              tintColor={colors.accent}
             />
           }
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={s.listContent}
         />
       )}
 
       {/* FAB to quickly take a photo */}
       {receipts.length > 0 && (
         <TouchableOpacity
-          style={styles.fab}
+          style={s.fab}
           onPress={() => navigation.navigate('Scan')}
         >
           <Ionicons name="camera" size={28} color="white" />
@@ -268,27 +271,27 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   loadingText: {
     marginTop: 15,
-    color: '#666',
+    color: c.textSecondary,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   header: {
     flexDirection: 'row',
@@ -297,6 +300,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 10,
+    backgroundColor: c.headerBg,
   },
   settingsButton: {
     padding: 4,
@@ -305,30 +309,30 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: c.textSecondary,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
     marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 16,
-    color: '#888',
+    color: c.textMuted,
     textAlign: 'center',
     marginBottom: 30,
     lineHeight: 22,
   },
   primaryButton: {
     flexDirection: 'row',
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     paddingVertical: 14,
     paddingHorizontal: 28,
     borderRadius: 8,
@@ -357,7 +361,7 @@ const styles = StyleSheet.create({
   dashboardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#333',
+    color: c.text,
   },
   noneRow: {
     flexDirection: 'row',
@@ -368,14 +372,14 @@ const styles = StyleSheet.create({
   },
   noneText: {
     fontSize: 14,
-    color: '#aaa',
+    color: c.textMuted,
   },
   dashboardSection: {
-    backgroundColor: 'white',
+    backgroundColor: c.cardBg,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
@@ -384,7 +388,7 @@ const styles = StyleSheet.create({
   dashboardSectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: c.textSecondary,
     marginBottom: 10,
   },
   dashboardItem: {
@@ -393,7 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: c.borderLight,
   },
   dashboardItemLeft: {
     flex: 1,
@@ -402,11 +406,11 @@ const styles = StyleSheet.create({
   dashboardItemMerchant: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: c.text,
   },
   dashboardItemDate: {
     fontSize: 12,
-    color: '#999',
+    color: c.textMuted,
     marginTop: 2,
   },
   dashboardBadge: {
@@ -420,20 +424,20 @@ const styles = StyleSheet.create({
   },
   dashboardDivider: {
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: c.border,
     marginVertical: 8,
   },
   fab: {
     position: 'absolute',
     right: 20,
     bottom: 20,
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     width: 60,
     height: 60,
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,

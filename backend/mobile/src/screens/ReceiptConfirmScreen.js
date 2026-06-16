@@ -1,13 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { parseReceipt, createReceipt, getCategories } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+
+function PressableScale({ onPress, disabled, style, children }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  return (
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} disabled={disabled} activeOpacity={0.85}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 export default function ReceiptConfirmScreen({ route, navigation }) {
   const { photoUri } = route.params;
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const [isParsing, setIsParsing] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -37,7 +54,6 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
     try {
       const data = await getCategories();
       setCategories(data);
-      // Auto-select the first default category if available
       if (data && data.length > 0) {
         setSelectedCategory(data[0].id);
       }
@@ -57,7 +73,6 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
       setDate(result.date || '');
       setCurrency(result.currency || 'AED');
 
-      // Warranty data from Gemini
       const hasWarranty = result.warranty_duration || result.return_period || result.warranty_notes;
       if (hasWarranty) {
         setWarrantyDuration(result.warranty_duration || '');
@@ -121,36 +136,28 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
     }
   };
 
-  const getSelectedCategoryName = () => {
-    if (!selectedCategory) return null;
-    const cat = categories.find(c => c.id === selectedCategory);
-    return cat ? `${cat.icon || ''} ${cat.name}`.trim() : 'Select category';
-  };
-
-  // Parsing in progress
   if (isParsing) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.parsingText}>Analyzing your receipt...</Text>
-        <Text style={styles.parsingSubtext}>Using AI to extract details</Text>
+      <View style={s.center}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={s.parsingText}>Analyzing your receipt...</Text>
+        <Text style={s.parsingSubtext}>Using AI to extract details</Text>
       </View>
     );
   }
 
-  // Parsing failed
   if (error) {
     return (
-      <View style={styles.center}>
-        <Ionicons name="alert-circle" size={64} color="#e74c3c" />
-        <Text style={styles.errorTitle}>Could not read receipt</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.button} onPress={parseImage}>
+      <View style={s.center}>
+        <Ionicons name="alert-circle" size={64} color={colors.danger} />
+        <Text style={s.errorTitle}>Could not read receipt</Text>
+        <Text style={s.errorText}>{error}</Text>
+        <PressableScale style={s.button} onPress={parseImage}>
           <Ionicons name="refresh" size={18} color="white" />
-          <Text style={styles.buttonText}>  Try Again</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.linkText}>Take another photo</Text>
+          <Text style={s.buttonText}>  Try Again</Text>
+        </PressableScale>
+        <TouchableOpacity style={s.linkButton} onPress={() => navigation.goBack()}>
+          <Text style={[s.linkText, { color: colors.accent }]}>Take another photo</Text>
         </TouchableOpacity>
       </View>
     );
@@ -158,77 +165,78 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={s.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Photo preview */}
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: photoUri }} style={styles.preview} />
+      <ScrollView contentContainerStyle={s.scroll}>
+        <View style={s.imageContainer}>
+          <Image source={{ uri: photoUri }} style={s.preview} />
         </View>
 
-        {/* Extracted fields */}
-        <View style={styles.form}>
-          <Text style={styles.sectionTitle}>Receipt Details</Text>
-          <Text style={styles.hint}>Edit any incorrect fields before saving</Text>
+        <View style={s.form}>
+          <Text style={s.sectionTitle}>Receipt Details</Text>
+          <Text style={s.hint}>Edit any incorrect fields before saving</Text>
 
-          <Text style={styles.label}>Merchant</Text>
+          <Text style={s.label}>Merchant</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             value={merchant}
             onChangeText={setMerchant}
             placeholder="Store name"
+            placeholderTextColor={colors.textMuted}
           />
 
-          <Text style={styles.label}>Total</Text>
-          <View style={styles.totalRow}>
+          <Text style={s.label}>Total</Text>
+          <View style={s.totalRow}>
             <TextInput
-              style={[styles.input, styles.currencyInput]}
+              style={[s.input, s.currencyInput]}
               value={currency}
               onChangeText={setCurrency}
               placeholder="AED"
               autoCapitalize="characters"
+              placeholderTextColor={colors.textMuted}
             />
             <TextInput
-              style={[styles.input, styles.amountInput]}
+              style={[s.input, s.amountInput]}
               value={total}
               onChangeText={setTotal}
               placeholder="0.00"
               keyboardType="decimal-pad"
+              placeholderTextColor={colors.textMuted}
             />
           </View>
 
-          <Text style={styles.label}>Date</Text>
+          <Text style={s.label}>Date</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             value={date}
             onChangeText={setDate}
             placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.textMuted}
           />
 
-          {/* Category selector */}
-          <Text style={styles.label}>Category</Text>
+          <Text style={s.label}>Category</Text>
           {categories.length > 0 ? (
-            <View style={styles.categoryContainer}>
+            <View style={s.categoryContainer}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryList}
+                contentContainerStyle={s.categoryList}
               >
                 {categories.map(cat => (
                   <TouchableOpacity
                     key={cat.id}
                     style={[
-                      styles.categoryChip,
-                      selectedCategory === cat.id && styles.categoryChipSelected,
+                      s.categoryChip,
+                      selectedCategory === cat.id && s.categoryChipSelected,
                     ]}
                     onPress={() => setSelectedCategory(cat.id)}
                   >
-                    <Text style={styles.categoryIcon}>{cat.icon || '📦'}</Text>
+                    <Text style={s.categoryIcon}>{cat.icon || '📦'}</Text>
                     <Text
                       style={[
-                        styles.categoryName,
-                        selectedCategory === cat.id && styles.categoryNameSelected,
+                        s.categoryName,
+                        selectedCategory === cat.id && s.categoryNameSelected,
                       ]}
                     >
                       {cat.name}
@@ -238,118 +246,103 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
               </ScrollView>
             </View>
           ) : (
-            <TouchableOpacity
-              style={styles.categoryPlaceholder}
-              onPress={loadCategories}
-            >
-              <Ionicons name="refresh" size={18} color="#4CAF50" />
-              <Text style={styles.categoryPlaceholderText}>  Load categories</Text>
+            <TouchableOpacity style={s.categoryPlaceholder} onPress={loadCategories}>
+              <Ionicons name="refresh" size={18} color={colors.accent} />
+              <Text style={[s.categoryPlaceholderText, { color: colors.accent }]}>  Load categories</Text>
             </TouchableOpacity>
           )}
 
-          {/* Warranty & Return Section (collapsible) */}
+          {/* Warranty & Return toggle */}
           <TouchableOpacity
-            style={styles.warrantyToggle}
+            style={s.warrantyToggle}
             onPress={() => setShowWarranty(!showWarranty)}
           >
-            <Ionicons
-              name={showWarranty ? 'chevron-up' : 'chevron-down'}
-              size={20}
-              color="#666"
-            />
-            <Text style={styles.warrantyToggleText}>
-              Warranty & Return
-            </Text>
+            <Ionicons name={showWarranty ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textSecondary} />
+            <Text style={s.warrantyToggleText}>Warranty & Return</Text>
             {(warrantyDuration || returnPeriod) && (
-              <View style={styles.warrantyBadge}>
-                <Text style={styles.warrantyBadgeText}>has data</Text>
+              <View style={[s.warrantyBadge, { backgroundColor: colors.accentLight }]}>
+                <Text style={[s.warrantyBadgeText, { color: colors.accent }]}>has data</Text>
               </View>
             )}
           </TouchableOpacity>
 
           {showWarranty && (
-            <View style={styles.warrantySection}>
-              <Text style={styles.warrantyHint}>
-                Add warranty and return policy info from your receipt
-              </Text>
+            <View style={s.warrantySection}>
+              <Text style={s.warrantyHint}>Add warranty and return policy info from your receipt</Text>
 
-              <Text style={styles.label}>Warranty Duration</Text>
+              <Text style={s.label}>Warranty Duration</Text>
               <TextInput
-                style={styles.input}
+                style={s.input}
                 value={warrantyDuration}
                 onChangeText={setWarrantyDuration}
                 placeholder="e.g. 2 years, 90 days"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.label}>Warranty Expiry Date</Text>
+              <Text style={s.label}>Warranty Expiry Date</Text>
               <TextInput
-                style={styles.input}
+                style={s.input}
                 value={warrantyExpiry}
                 onChangeText={setWarrantyExpiry}
-                placeholder="YYYY-MM-DD (optional, auto-calculated)"
+                placeholder="YYYY-MM-DD (optional)"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.label}>Return Period</Text>
+              <Text style={s.label}>Return Period</Text>
               <TextInput
-                style={styles.input}
+                style={s.input}
                 value={returnPeriod}
                 onChangeText={setReturnPeriod}
                 placeholder="e.g. 14 days, 30 days"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.label}>Return Expiry Date</Text>
+              <Text style={s.label}>Return Expiry Date</Text>
               <TextInput
-                style={styles.input}
+                style={s.input}
                 value={returnExpiry}
                 onChangeText={setReturnExpiry}
-                placeholder="YYYY-MM-DD (optional, auto-calculated)"
+                placeholder="YYYY-MM-DD (optional)"
+                placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={styles.label}>Warranty Notes</Text>
+              <Text style={s.label}>Warranty Notes</Text>
               <TextInput
-                style={[styles.input, styles.notesInput]}
+                style={[s.input, s.notesInput]}
                 value={warrantyNotes}
                 onChangeText={setWarrantyNotes}
                 placeholder="Any additional warranty details..."
+                placeholderTextColor={colors.textMuted}
                 multiline
               />
             </View>
           )}
         </View>
 
-        {/* Action buttons */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={() => navigation.goBack()}
-            disabled={isSaving}
-          >
-            <Text style={styles.cancelText}>Cancel</Text>
+        <View style={s.actions}>
+          <TouchableOpacity style={s.cancelBtn} onPress={() => navigation.goBack()} disabled={isSaving}>
+            <Text style={s.cancelText}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.saveBtn, isSaving && styles.savingBtn]}
-            onPress={handleSave}
-            disabled={isSaving}
-          >
+          <PressableScale style={[s.saveBtn, isSaving && s.savingBtn]} onPress={handleSave} disabled={isSaving}>
             {isSaving ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={20} color="white" />
-                <Text style={styles.saveText}>  Save Receipt</Text>
+                <Text style={s.saveText}>  Save Receipt</Text>
               </>
             )}
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   scroll: {
     paddingBottom: 40,
@@ -359,29 +352,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 30,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   parsingText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: c.text,
     marginTop: 20,
   },
   parsingSubtext: {
     fontSize: 14,
-    color: '#888',
+    color: c.textMuted,
     marginTop: 8,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
     marginTop: 20,
     marginBottom: 10,
   },
   errorText: {
     fontSize: 16,
-    color: '#666',
+    color: c.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
@@ -390,8 +383,8 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
+    backgroundColor: c.cardBg,
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -403,12 +396,12 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   form: {
-    backgroundColor: 'white',
+    backgroundColor: c.cardBg,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 12,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -417,30 +410,30 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
     marginBottom: 4,
   },
   hint: {
     fontSize: 13,
-    color: '#999',
+    color: c.textMuted,
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#555',
+    color: c.textSecondary,
     marginBottom: 6,
     marginTop: 12,
   },
   input: {
     height: 48,
-    borderColor: '#ddd',
+    borderColor: c.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
     fontSize: 16,
-    backgroundColor: '#fafafa',
-    color: '#333',
+    backgroundColor: c.inputBg,
+    color: c.text,
   },
   totalRow: {
     flexDirection: 'row',
@@ -453,7 +446,6 @@ const styles = StyleSheet.create({
   amountInput: {
     flex: 1,
   },
-  // Category styles
   categoryContainer: {
     marginTop: 4,
   },
@@ -469,13 +461,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#ddd',
-    backgroundColor: '#fafafa',
+    borderColor: c.inputBorder,
+    backgroundColor: c.inputBg,
     gap: 4,
   },
   categoryChipSelected: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#E8F5E9',
+    borderColor: c.accent,
+    backgroundColor: c.accentLight,
   },
   categoryIcon: {
     fontSize: 16,
@@ -483,10 +475,10 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#555',
+    color: c.textSecondary,
   },
   categoryNameSelected: {
-    color: '#2E7D32',
+    color: c.accent,
     fontWeight: '700',
   },
   categoryPlaceholder: {
@@ -496,13 +488,50 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#4CAF50',
+    borderColor: c.accent,
     borderStyle: 'dashed',
   },
   categoryPlaceholderText: {
-    color: '#4CAF50',
     fontSize: 14,
     fontWeight: '500',
+  },
+  warrantyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+  },
+  warrantyToggleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: c.textSecondary,
+    marginLeft: 8,
+    flex: 1,
+  },
+  warrantyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  warrantyBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  warrantySection: {
+    marginTop: 12,
+    paddingTop: 8,
+  },
+  warrantyHint: {
+    fontSize: 13,
+    color: c.textMuted,
+    marginBottom: 8,
+  },
+  notesInput: {
+    height: 80,
+    textAlignVertical: 'top',
+    paddingTop: 12,
   },
   actions: {
     flexDirection: 'row',
@@ -515,13 +544,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: c.inputBorder,
     alignItems: 'center',
   },
   cancelText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
+    color: c.textSecondary,
   },
   saveBtn: {
     flex: 2,
@@ -530,7 +559,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
   },
   savingBtn: {
     opacity: 0.7,
@@ -540,49 +569,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  warrantyToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  warrantyToggleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
-    marginLeft: 8,
-    flex: 1,
-  },
-  warrantyBadge: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  warrantyBadgeText: {
-    fontSize: 11,
-    color: '#2E7D32',
-    fontWeight: '600',
-  },
-  warrantySection: {
-    marginTop: 12,
-    paddingTop: 8,
-  },
-  warrantyHint: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 8,
-  },
-  notesInput: {
-    height: 80,
-    textAlignVertical: 'top',
-    paddingTop: 12,
-  },
   button: {
     flexDirection: 'row',
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -598,7 +587,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   linkText: {
-    color: '#4CAF50',
     fontSize: 15,
   },
 });

@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthProvider, AuthContext } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
@@ -33,6 +34,7 @@ function AuthStack() {
 }
 
 function AppTabs() {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -54,8 +56,12 @@ function AppTabs() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#4CAF50',
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.border,
+        },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -68,6 +74,7 @@ function AppTabs() {
 }
 
 function MainNavigator() {
+  const { colors } = useTheme();
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="HomeTabs" component={AppTabs} />
@@ -90,28 +97,37 @@ function MainNavigator() {
   );
 }
 
+function AppContent() {
+  const { colors } = useTheme();
+  return (
+    <AuthContext.Consumer>
+      {({ isAuthenticated, isLoading }) => {
+        if (isLoading) {
+          return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <StatusBar style={colors.statusBar} />
+            </View>
+          );
+        }
+
+        return (
+          <NavigationContainer>
+            <StatusBar style={colors.statusBar} />
+            {isAuthenticated ? <MainNavigator /> : <AuthStack />}
+          </NavigationContainer>
+        );
+      }}
+    </AuthContext.Consumer>
+  );
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthContext.Consumer>
-        {({ isAuthenticated, isLoading }) => {
-          if (isLoading) {
-            return (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#4CAF50" />
-                <StatusBar style="auto" />
-              </View>
-            );
-          }
-
-          return (
-            <NavigationContainer>
-              <StatusBar style="auto" />
-              {isAuthenticated ? <MainNavigator /> : <AuthStack />}
-            </NavigationContainer>
-          );
-        }}
-      </AuthContext.Consumer>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

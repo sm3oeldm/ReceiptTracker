@@ -1,24 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 
-/**
- * Calculate days remaining until a target date.
- * Returns a positive number for future dates, negative for past, null if invalid.
- */
 function daysUntil(dateString) {
   if (!dateString) return null;
   const target = new Date(dateString);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   target.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-  return diff;
+  return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Get badge config for an expiry date.
- */
 function getBadge(days) {
   if (days === null) return null;
   if (days < 0) return { label: 'Expired', color: '#e74c3c', bg: '#FDEDED', icon: 'alert-circle' };
@@ -27,10 +20,13 @@ function getBadge(days) {
   if (days <= 7) return { label: `${days} Days Left`, color: '#f1c40f', bg: '#FFFDE7', icon: 'time' };
   if (days <= 14) return { label: `${days} Days Left`, color: '#8bc34a', bg: '#F1F8E9', icon: 'time' };
   if (days <= 30) return { label: `${days} Days Left`, color: '#4CAF50', bg: '#E8F5E9', icon: 'time' };
-  return null; // More than 30 days — don't show badge
+  return null;
 }
 
 export default function ReceiptCard({ receipt, onPress }) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -40,46 +36,43 @@ export default function ReceiptCard({ receipt, onPress }) {
     });
   };
 
-  // Warranty/return badges
   const returnDays = daysUntil(receipt.return_expiry_date);
   const warrantyDays = daysUntil(receipt.warranty_expiry_date);
   const returnBadge = receipt.return_expiry_date ? getBadge(returnDays) : null;
   const warrantyBadge = receipt.warranty_expiry_date ? getBadge(warrantyDays) : null;
 
-  // Skip badges for warranties > 30 days out
   const showReturnBadge = returnBadge && returnDays <= 30;
   const showWarrantyBadge = warrantyBadge && warrantyDays <= 30;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <View style={styles.header}>
-        <Text style={styles.merchant}>{receipt.merchant}</Text>
-        <Text style={styles.amount}>AED {receipt.total?.toFixed(2)}</Text>
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.7}>
+      <View style={s.header}>
+        <Text style={s.merchant}>{receipt.merchant}</Text>
+        <Text style={s.amount}>AED {receipt.total?.toFixed(2)}</Text>
       </View>
 
-      <View style={styles.details}>
-        <View style={styles.categoryContainer}>
-          <Text style={styles.categoryIcon}>{receipt.categories?.icon || '📦'}</Text>
-          <Text style={styles.categoryName}>{receipt.categories?.name || 'Other'}</Text>
+      <View style={s.details}>
+        <View style={s.categoryContainer}>
+          <Text style={s.categoryIcon}>{receipt.categories?.icon || '📦'}</Text>
+          <Text style={s.categoryName}>{receipt.categories?.name || 'Other'}</Text>
         </View>
-        <Text style={styles.date}>{formatDate(receipt.receipt_date)}</Text>
+        <Text style={s.date}>{formatDate(receipt.receipt_date)}</Text>
       </View>
 
-      {/* Warranty & Return badges */}
       {(showReturnBadge || showWarrantyBadge) && (
-        <View style={styles.badgeRow}>
+        <View style={s.badgeRow}>
           {showReturnBadge && (
-            <View style={[styles.badge, { backgroundColor: returnBadge.bg }]}>
+            <View style={[s.badge, { backgroundColor: returnBadge.bg }]}>
               <Ionicons name={returnBadge.icon} size={12} color={returnBadge.color} />
-              <Text style={[styles.badgeText, { color: returnBadge.color }]}>
+              <Text style={[s.badgeText, { color: returnBadge.color }]}>
                 Return: {returnBadge.label}
               </Text>
             </View>
           )}
           {showWarrantyBadge && (
-            <View style={[styles.badge, { backgroundColor: warrantyBadge.bg }]}>
+            <View style={[s.badge, { backgroundColor: warrantyBadge.bg }]}>
               <Ionicons name={warrantyBadge.icon} size={12} color={warrantyBadge.color} />
-              <Text style={[styles.badgeText, { color: warrantyBadge.color }]}>
+              <Text style={[s.badgeText, { color: warrantyBadge.color }]}>
                 Warranty: {warrantyBadge.label}
               </Text>
             </View>
@@ -88,22 +81,22 @@ export default function ReceiptCard({ receipt, onPress }) {
       )}
 
       {receipt.notes && (
-        <View style={styles.notesContainer}>
-          <Ionicons name="information-circle" size={16} color="#666" />
-          <Text style={styles.notes}>{receipt.notes}</Text>
+        <View style={s.notesContainer}>
+          <Ionicons name="information-circle" size={16} color={colors.textSecondary} />
+          <Text style={s.notes}>{receipt.notes}</Text>
         </View>
       )}
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   card: {
-    backgroundColor: 'white',
+    backgroundColor: c.cardBg,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -118,13 +111,13 @@ const styles = StyleSheet.create({
   merchant: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: c.text,
     flex: 1,
   },
   amount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: c.accent,
     marginLeft: 10,
   },
   details: {
@@ -143,11 +136,11 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 14,
-    color: '#666',
+    color: c.textSecondary,
   },
   date: {
     fontSize: 14,
-    color: '#999',
+    color: c.textMuted,
   },
   notesContainer: {
     flexDirection: 'row',
@@ -155,11 +148,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: c.border,
   },
   notes: {
     fontSize: 14,
-    color: '#666',
+    color: c.textSecondary,
     marginLeft: 8,
     flex: 1,
   },
@@ -170,7 +163,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: c.border,
   },
   badge: {
     flexDirection: 'row',
