@@ -3,11 +3,22 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const authMiddleware = require('../middleware/authMiddleware');
-const { validateReceiptInput, validateQueryParams } = require('../middleware/validationMiddleware');
+const { validateReceiptInput, validateQueryParams, validateUUIDParam } = require('../middleware/validationMiddleware');
+const { RATE_LIMITS } = require('../config/constants');
+const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Rate limiter for receipt parsing (costly Gemini API calls)
+const parseLimiter = rateLimit({
+  windowMs: RATE_LIMITS.RECEIPT_PARSE.windowMs,
+  max: RATE_LIMITS.RECEIPT_PARSE.max,
+  message: RATE_LIMITS.RECEIPT_PARSE.message,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Configure multer for in-memory storage with size and type limits
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -24,7 +35,7 @@ const upload = multer({
 });
 
 // Parse receipt image using Gemini
-router.post('/parse', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/parse', authMiddleware, parseLimiter, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file provided' });
@@ -42,8 +53,8 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
     { "merchant": string, "total": number, "currency": string, "date": "YYYY-MM-DD", "items": [{ "name": string, "price": number }] }.
     If a field cannot be determined, use null. The currency should be the ISO 4217 code (e.g. AED, USD).`;
 
-    // Send the image to Gemini
-    const result = await model.generateContent([
+    // Send the image to Gemini (with 30s timeout)
+    const geminiPromise = model.generateContent([
       {
         inlineData: {
           data: imageBase64,
@@ -54,6 +65,10 @@ router.post('/parse', authMiddleware, upload.single('image'), async (req, res) =
         text: prompt
       }
     ]);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini API request timed out')), 30000)
+    );
+    const result = await Promise.race([geminiPromise, timeoutPromise]);
 
     const responseText = result.response.text();
     console.log('Gemini raw response:', responseText.substring(0, 500));
@@ -174,7 +189,7 @@ router.get('/', authMiddleware, validateQueryParams, async (req, res) => {
 });
 
 // Get a single receipt
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authMiddleware, validateUUIDParam, async (req, res) => {
   const receiptId = req.params.id;
   const userId = req.user.id;
 
@@ -198,7 +213,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 });
 
 // Update a receipt
-router.put('/:id', authMiddleware, validateReceiptInput, async (req, res) => {
+router.put('/:id', authMiddleware, validateUUIDParam, validateReceiptInput, async (req, res) => {
   const receiptId = req.params.id;
   const userId = req.user.id;
   const { merchant, total, currency, date, items, category_id, notes } = req.body;
@@ -229,7 +244,7 @@ router.put('/:id', authMiddleware, validateReceiptInput, async (req, res) => {
 });
 
 // Delete a receipt
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, validateUUIDParam, async (req, res) => {
   const receiptId = req.params.id;
   const userId = req.user.id;
 

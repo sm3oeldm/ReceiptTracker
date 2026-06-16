@@ -25,10 +25,12 @@ module.exports = (supabase) => {
       });
     }
 
-    if (password.length < 6) {
+    // Note: Middleware (validateAuthInput) already enforces 8-char minimum;
+    // this is a safety net for direct route access
+    if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        error: 'Password must be at least 6 characters'
+        error: 'Password must be at least 8 characters'
       });
     }
 

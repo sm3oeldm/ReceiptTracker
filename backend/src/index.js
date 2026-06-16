@@ -57,7 +57,7 @@ app.use('/api/', apiRateLimiter);
 
 // ==== Secret Validation ====
 
-const requiredVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY'];
+const requiredVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SUPABASE_ANON_KEY', 'GEMINI_API_KEY'];
 const missing = requiredVars.filter(v => !process.env[v]);
 if (missing.length > 0) {
   console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);

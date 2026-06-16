@@ -36,7 +36,8 @@ pids/
 
 # OS generated files
 Thumbs.db
-.eot
+.DS_Store
+*.swp
 
 # Markdown files
 *.md
@@ -44,13 +45,12 @@ Thumbs.db
 
 # Claude config
 .claude/
-Thumbs.db
-.eot
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 
 # Database
 *.sqlite

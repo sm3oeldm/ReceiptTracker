@@ -1,7 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const { RATE_LIMITS } = require('../config/constants');
+const rateLimit = require('express-rate-limit');
 const authMiddleware = require('../middleware/authMiddleware');
+
+// Rate limiter for reports (heavy DB queries)
+const reportsLimiter = rateLimit({
+  windowMs: RATE_LIMITS.REPORTS.windowMs,
+  max: RATE_LIMITS.REPORTS.max,
+  message: RATE_LIMITS.REPORTS.message,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * Validate year/month route params
@@ -23,7 +34,7 @@ function validateReportParams(req, res, next) {
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 // Get monthly report
-router.get('/:year/:month', authMiddleware, validateReportParams, async (req, res) => {
+router.get('/:year/:month', authMiddleware, reportsLimiter, validateReportParams, async (req, res) => {
   const userId = req.user.id;
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);
@@ -207,7 +218,7 @@ router.get('/:year/:month', authMiddleware, validateReportParams, async (req, re
 });
 
 // Export CSV
-router.get('/:year/:month/export/csv', authMiddleware, validateReportParams, async (req, res) => {
+router.get('/:year/:month/export/csv', authMiddleware, reportsLimiter, validateReportParams, async (req, res) => {
   const userId = req.user.id;
   const year = parseInt(req.params.year);
   const month = parseInt(req.params.month);

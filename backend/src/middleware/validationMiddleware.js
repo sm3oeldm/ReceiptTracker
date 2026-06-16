@@ -191,6 +191,17 @@ function validateReceiptInput(req, res, next) {
     }
   }
 
+  // Currency validation
+  if (currency !== undefined) {
+    const validCurrencies = ['AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD'];
+    if (typeof currency !== 'string' || !validCurrencies.includes(currency.toUpperCase())) {
+      return res.status(400).json({
+        error: 'Invalid currency',
+        message: `Currency must be one of: ${validCurrencies.join(', ')}`
+      });
+    }
+  }
+
   // Items validation
   if (items !== undefined) {
     if (!Array.isArray(items)) {
@@ -287,6 +298,77 @@ function validateQueryParams(req, res, next) {
   next();
 }
 
+/**
+ * UUID v4 regex pattern
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Validate that a route parameter is a valid UUID v4
+ */
+function validateUUID(value, name = 'id') {
+  return UUID_RE.test(value);
+}
+
+/**
+ * Middleware to validate UUID route params
+ */
+function validateUUIDParam(req, res, next) {
+  const id = req.params.id;
+  if (id && !validateUUID(id)) {
+    return res.status(400).json({
+      error: 'Invalid ID format',
+      message: 'The provided ID is not a valid UUID'
+    });
+  }
+  next();
+}
+
+/**
+ * Middleware to validate conversation history messages
+ */
+function validateConversationHistory(req, res, next) {
+  const { conversation_history } = req.body;
+  if (conversation_history === undefined) return next();
+
+  if (!Array.isArray(conversation_history)) {
+    return res.status(400).json({
+      error: 'Invalid conversation history',
+      message: 'conversation_history must be an array'
+    });
+  }
+
+  if (conversation_history.length > 50) {
+    return res.status(400).json({
+      error: 'Conversation too long',
+      message: 'conversation_history must have at most 50 messages'
+    });
+  }
+
+  for (const msg of conversation_history) {
+    if (!msg || typeof msg !== 'object') {
+      return res.status(400).json({
+        error: 'Invalid message',
+        message: 'Each message must be an object with role and content'
+      });
+    }
+    if (!['user', 'assistant'].includes(msg.role)) {
+      return res.status(400).json({
+        error: 'Invalid message role',
+        message: 'Message role must be "user" or "assistant"'
+      });
+    }
+    if (typeof msg.content !== 'string' || msg.content.length > 4000) {
+      return res.status(400).json({
+        error: 'Invalid message content',
+        message: 'Message content must be a string with at most 4000 characters'
+      });
+    }
+  }
+
+  next();
+}
+
 module.exports = {
   validateJsonPayload,
   sanitizeInput,
@@ -295,5 +377,8 @@ module.exports = {
   validateGroupInput,
   validateCategoryInput,
   validateQueryParams,
+  validateUUID,
+  validateUUIDParam,
+  validateConversationHistory,
   FIELD_LIMITS,
 };

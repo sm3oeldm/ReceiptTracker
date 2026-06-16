@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/authMiddleware');
+const { validateConversationHistory } = require('../middleware/validationMiddleware');
+const { RATE_LIMITS } = require('../config/constants');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter for AI assistant (paid Gemini API calls)
+const assistantLimiter = rateLimit({
+  windowMs: RATE_LIMITS.RECEIPT_PARSE.windowMs,
+  max: RATE_LIMITS.RECEIPT_PARSE.max,
+  message: { success: false, error: 'Too many AI assistant requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
@@ -47,7 +59,7 @@ ${receiptsBlock || '  No receipts found.'}`;
  * POST /api/assistant/chat
  * Chat with the AI spending assistant.
  */
-router.post('/chat', authMiddleware, async (req, res) => {
+router.post('/chat', authMiddleware, assistantLimiter, validateConversationHistory, async (req, res) => {
   try {
     const { message, conversation_history } = req.body;
     const userId = req.user.id;
@@ -217,7 +229,13 @@ ${contextString}`;
     });
 
     const chat = model.startChat({ history });
-    const result = await chat.sendMessage(message.trim());
+
+    // Send message with 30s timeout
+    const geminiPromise = chat.sendMessage(message.trim());
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini API request timed out')), 30000)
+    );
+    const result = await Promise.race([geminiPromise, timeoutPromise]);
     const reply = result.response.text();
 
     res.json({ reply });
