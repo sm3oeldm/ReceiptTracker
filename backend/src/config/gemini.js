@@ -66,12 +66,12 @@ function getNextModelIndex() {
  *
  * @param {Function} callFn - Async function(genAI, modelName) => result
  * @param {Object}   [options]
- * @param {number}   [options.timeoutMs=30000]    Per-attempt timeout
+ * @param {number}   [options.timeoutMs=5000]     Per-attempt timeout
  * @param {number}   [options.retryDelayMs=300]   Delay between fallback attempts
  * @returns {Promise<any>} The resolved value from the first successful callFn
  */
 async function withModelFallback(callFn, options = {}) {
-  const { timeoutMs = 30000, retryDelayMs = 300 } = options;
+  const { timeoutMs = 5000, retryDelayMs = 300 } = options;
   const errors = [];
 
   const startIdx = getNextModelIndex();
