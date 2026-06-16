@@ -14,7 +14,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
 import { chatWithAssistant, transcribeAudio } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
@@ -23,6 +28,12 @@ const SUGGESTIONS = [
   "What's my most expensive category?",
   "Where did I buy the cheapest groceries?"
 ];
+
+// Static styles for TypingDots (no theme dependency)
+const dotStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center' },
+  dot: { fontSize: 10, marginRight: 3 },
+});
 
 function TypingDots({ colors }) {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -73,10 +84,10 @@ function TypingDots({ colors }) {
   });
 
   return (
-    <View style={styles.typingDots}>
-      <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot1)]}>●</Animated.Text>
-      <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot2)]}>●</Animated.Text>
-      <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot3)]}>●</Animated.Text>
+    <View style={dotStyles.row}>
+      <Animated.Text style={[dotStyles.dot, { color: colors.textMuted }, getOpacity(dot1)]}>●</Animated.Text>
+      <Animated.Text style={[dotStyles.dot, { color: colors.textMuted }, getOpacity(dot2)]}>●</Animated.Text>
+      <Animated.Text style={[dotStyles.dot, { color: colors.textMuted }, getOpacity(dot3)]}>●</Animated.Text>
     </View>
   );
 }
@@ -93,7 +104,7 @@ export default function AssistantScreen() {
   const [hasSentMessage, setHasSentMessage] = useState(false);
 
   const scrollViewRef = useRef(null);
-  const recordingRef = useRef(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   // Welcome message on first mount
   useEffect(() => {
@@ -117,11 +128,6 @@ export default function AssistantScreen() {
     }
   }, [messages]);
 
-  // Request audio recording permissions on mount
-  useEffect(() => {
-    Audio.requestPermissionsAsync().catch(() => {});
-  }, []);
-
   const sendMessage = async (text) => {
     if (!text.trim() || isLoading) return;
 
@@ -137,7 +143,6 @@ export default function AssistantScreen() {
     setIsLoading(true);
     setHasSentMessage(true);
 
-    // Build conversation history for API (exclude welcome message)
     const history = messages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .filter(m => !m.isWelcome)
@@ -200,21 +205,16 @@ export default function AssistantScreen() {
 
   const startRecording = async () => {
     try {
-      // Ensure we have permission
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
-        return;
-      }
+      const { granted } = await requestRecordingPermissionsAsync();
+      if (!granted) return;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
       });
 
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      recordingRef.current = recording;
-      await recording.startAsync();
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -223,27 +223,21 @@ export default function AssistantScreen() {
   };
 
   const stopRecording = async () => {
-    const recording = recordingRef.current;
-    if (!recording) return;
-
     try {
       setIsRecording(false);
       setIsTranscribing(true);
 
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
+      await recorder.stop();
+      await setAudioModeAsync({
+        allowsRecording: false,
       });
 
-      const uri = recording.getURI();
-      recordingRef.current = null;
-
+      const uri = recorder.uri;
       if (!uri) {
         setIsTranscribing(false);
         return;
       }
 
-      // Determine MIME type from extension
       const ext = uri.split('.').pop()?.toLowerCase();
       const mimeType = ext === 'wav' ? 'audio/wav'
         : ext === 'amr' ? 'audio/amr'
@@ -256,7 +250,6 @@ export default function AssistantScreen() {
 
       if (text) {
         setInputText(text);
-        // Auto-send short queries (less than ~100 chars)
         if (text.length < 100) {
           setTimeout(() => sendMessage(text), 300);
         }
@@ -323,7 +316,6 @@ export default function AssistantScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* Header */}
       <View style={s.header}>
         <Text style={s.headerTitle}>Assistant</Text>
         <TouchableOpacity onPress={clearChat} style={s.clearButton}>
@@ -331,7 +323,6 @@ export default function AssistantScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Messages */}
       <ScrollView
         ref={scrollViewRef}
         style={s.messagesContainer}
@@ -340,7 +331,6 @@ export default function AssistantScreen() {
       >
         {messages.map(renderMessageBubble)}
 
-        {/* Loading indicator */}
         {isLoading && (
           <View key="loading" style={[s.bubbleRow, s.assistantRow]}>
             <View style={[s.bubble, s.assistantBubble, s.loadingBubble]}>
@@ -349,7 +339,6 @@ export default function AssistantScreen() {
           </View>
         )}
 
-        {/* Suggestion chips — only show before first message */}
         {!hasSentMessage && (
           <View style={s.suggestionsContainer}>
             {SUGGESTIONS.map((suggestion, index) => (
@@ -365,7 +354,6 @@ export default function AssistantScreen() {
         )}
       </ScrollView>
 
-      {/* Recording / Speaking status bar */}
       {(isRecording || isSpeaking || isTranscribing) && (
         <View style={s.voiceStatusBar}>
           {isRecording ? (
@@ -383,7 +371,6 @@ export default function AssistantScreen() {
         </View>
       )}
 
-      {/* Input row */}
       <View style={s.inputContainer}>
         <TouchableOpacity
           style={[s.micButton, (isRecording || isTranscribing) && s.micButtonActive]}
@@ -519,14 +506,6 @@ const makeStyles = (c) => StyleSheet.create({
     fontSize: 12,
     color: c.textSecondary,
     marginLeft: 4,
-  },
-  typingDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dot: {
-    fontSize: 10,
-    marginRight: 3,
   },
   suggestionsContainer: {
     flexDirection: 'row',
