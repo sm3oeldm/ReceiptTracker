@@ -20,6 +20,14 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
+  // Warranty & return fields
+  const [warrantyDuration, setWarrantyDuration] = useState('');
+  const [warrantyExpiry, setWarrantyExpiry] = useState('');
+  const [returnPeriod, setReturnPeriod] = useState('');
+  const [returnExpiry, setReturnExpiry] = useState('');
+  const [warrantyNotes, setWarrantyNotes] = useState('');
+  const [showWarranty, setShowWarranty] = useState(false);
+
   useEffect(() => {
     loadCategories();
     parseImage();
@@ -48,6 +56,15 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
       setTotal(result.total?.toString() || '');
       setDate(result.date || '');
       setCurrency(result.currency || 'AED');
+
+      // Warranty data from Gemini
+      const hasWarranty = result.warranty_duration || result.return_period || result.warranty_notes;
+      if (hasWarranty) {
+        setWarrantyDuration(result.warranty_duration || '');
+        setReturnPeriod(result.return_period || '');
+        setWarrantyNotes(result.warranty_notes || '');
+        setShowWarranty(!!hasWarranty);
+      }
     } catch (err) {
       console.error('Parse error:', err);
       setError(err.message);
@@ -86,6 +103,12 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
         currency: currency || 'AED',
         date: date.trim(),
         category_id: selectedCategory,
+        warranty_duration: warrantyDuration.trim() || null,
+        warranty_expiry_date: warrantyExpiry.trim() || null,
+        return_period: returnPeriod.trim() || null,
+        return_expiry_date: returnExpiry.trim() || null,
+        warranty_notes: warrantyNotes.trim() || null,
+        extracted_by_gemini: !!(warrantyDuration || returnPeriod || warrantyNotes),
       });
       Alert.alert('Saved!', 'Receipt has been saved successfully.', [
         { text: 'OK', onPress: () => navigation.navigate('HomeTabs', { screen: 'Home' }) },
@@ -222,6 +245,75 @@ export default function ReceiptConfirmScreen({ route, navigation }) {
               <Ionicons name="refresh" size={18} color="#4CAF50" />
               <Text style={styles.categoryPlaceholderText}>  Load categories</Text>
             </TouchableOpacity>
+          )}
+
+          {/* Warranty & Return Section (collapsible) */}
+          <TouchableOpacity
+            style={styles.warrantyToggle}
+            onPress={() => setShowWarranty(!showWarranty)}
+          >
+            <Ionicons
+              name={showWarranty ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#666"
+            />
+            <Text style={styles.warrantyToggleText}>
+              Warranty & Return
+            </Text>
+            {(warrantyDuration || returnPeriod) && (
+              <View style={styles.warrantyBadge}>
+                <Text style={styles.warrantyBadgeText}>has data</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {showWarranty && (
+            <View style={styles.warrantySection}>
+              <Text style={styles.warrantyHint}>
+                Add warranty and return policy info from your receipt
+              </Text>
+
+              <Text style={styles.label}>Warranty Duration</Text>
+              <TextInput
+                style={styles.input}
+                value={warrantyDuration}
+                onChangeText={setWarrantyDuration}
+                placeholder="e.g. 2 years, 90 days"
+              />
+
+              <Text style={styles.label}>Warranty Expiry Date</Text>
+              <TextInput
+                style={styles.input}
+                value={warrantyExpiry}
+                onChangeText={setWarrantyExpiry}
+                placeholder="YYYY-MM-DD (optional, auto-calculated)"
+              />
+
+              <Text style={styles.label}>Return Period</Text>
+              <TextInput
+                style={styles.input}
+                value={returnPeriod}
+                onChangeText={setReturnPeriod}
+                placeholder="e.g. 14 days, 30 days"
+              />
+
+              <Text style={styles.label}>Return Expiry Date</Text>
+              <TextInput
+                style={styles.input}
+                value={returnExpiry}
+                onChangeText={setReturnExpiry}
+                placeholder="YYYY-MM-DD (optional, auto-calculated)"
+              />
+
+              <Text style={styles.label}>Warranty Notes</Text>
+              <TextInput
+                style={[styles.input, styles.notesInput]}
+                value={warrantyNotes}
+                onChangeText={setWarrantyNotes}
+                placeholder="Any additional warranty details..."
+                multiline
+              />
+            </View>
           )}
         </View>
 
@@ -447,6 +539,46 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
+  },
+  warrantyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  warrantyToggleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#555',
+    marginLeft: 8,
+    flex: 1,
+  },
+  warrantyBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  warrantyBadgeText: {
+    fontSize: 11,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  warrantySection: {
+    marginTop: 12,
+    paddingTop: 8,
+  },
+  warrantyHint: {
+    fontSize: 13,
+    color: '#999',
+    marginBottom: 8,
+  },
+  notesInput: {
+    height: 80,
+    textAlignVertical: 'top',
+    paddingTop: 12,
   },
   button: {
     flexDirection: 'row',

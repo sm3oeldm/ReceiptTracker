@@ -61,6 +61,15 @@ const RECEIPT_VALIDATION = {
   MAX_ITEM_PRICE: 100000
 };
 
+// Warranty & Return validation limits
+const WARRANTY_VALIDATION = {
+  MAX_WARRANTY_DURATION_LENGTH: 50,       // e.g. "2 years" or "90 days"
+  MAX_RETURN_PERIOD_LENGTH: 50,           // e.g. "14 days"
+  MAX_WARRANTY_NOTES_LENGTH: 500,
+  EXPIRING_SOON_DAYS_RETURN: 7,          // countdown threshold for return expiry
+  EXPIRING_SOON_DAYS_WARRANTY: 30,       // countdown threshold for warranty expiry
+};
+
 // Pagination defaults
 const PAGINATION = {
   DEFAULT_LIMIT: 20,
@@ -87,6 +96,7 @@ module.exports = {
   CURRENCY,
   RATE_LIMITS,
   RECEIPT_VALIDATION,
+  WARRANTY_VALIDATION,
   PAGINATION,
   ERROR_CODES
 };

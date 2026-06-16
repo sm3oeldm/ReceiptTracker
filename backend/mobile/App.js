@@ -16,6 +16,7 @@ import ReportScreen from './src/screens/ReportScreen';
 import GroupScreen from './src/screens/GroupScreen';
 import AssistantScreen from './src/screens/AssistantScreen';
 import ReceiptConfirmScreen from './src/screens/ReceiptConfirmScreen';
+import ReceiptDetailScreen from './src/screens/ReceiptDetailScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
 const RootStack = createNativeStackNavigator();
@@ -74,6 +75,11 @@ function MainNavigator() {
         name="ReceiptConfirm"
         component={ReceiptConfirmScreen}
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <RootStack.Screen
+        name="ReceiptDetail"
+        component={ReceiptDetailScreen}
+        options={{ animation: 'slide_from_right' }}
       />
       <RootStack.Screen
         name="Profile"

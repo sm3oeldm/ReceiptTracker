@@ -54,6 +54,15 @@ export const getReceipts = async (month, year) => {
   }
 };
 
+// GET a single receipt by ID
+export const getReceiptById = async (receiptId) => {
+  try {
+    return await authFetch(`receipts/${receiptId}`);
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
 // GET current group (if applicable)
 export const getCurrentGroup = async () => {
   try {
@@ -158,6 +167,27 @@ export const createReceipt = async (receiptData) => {
       method: 'POST',
       body: JSON.stringify(receiptData),
     });
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
+// UPDATE an existing receipt
+export const updateReceipt = async (receiptId, receiptData) => {
+  try {
+    return await authFetch(`receipts/${receiptId}`, {
+      method: 'PUT',
+      body: JSON.stringify(receiptData),
+    });
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
+// GET receipts with active warranties or return periods
+export const getWarranties = async () => {
+  try {
+    return await authFetch('receipts/warranties/list');
   } catch (error) {
     throw new Error(error.message);
   }

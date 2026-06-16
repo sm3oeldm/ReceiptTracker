@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/authMiddleware');
-const { validateReceiptInput, validateQueryParams, validateUUIDParam } = require('../middleware/validationMiddleware');
+const { validateReceiptInput, validateWarrantyInput, validateQueryParams, validateUUIDParam } = require('../middleware/validationMiddleware');
 const { RATE_LIMITS } = require('../config/constants');
 const { withModelFallback } = require('../config/gemini');
 const rateLimit = require('express-rate-limit');
@@ -44,10 +44,13 @@ router.post('/parse', authMiddleware, parseLimiter, upload.single('image'), asyn
     const imageBase64 = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
 
-    // Prepare the prompt
+    // Prepare the prompt — ask Gemini to also extract warranty/return info if visible
     const prompt = `You are a receipt parser. Extract the following from the receipt image and return ONLY valid JSON with no markdown, no explanation:
-    { "merchant": string, "total": number, "currency": string, "date": "YYYY-MM-DD", "items": [{ "name": string, "price": number }] }.
-    If a field cannot be determined, use null. The currency should be the ISO 4217 code (e.g. AED, USD).`;
+    { "merchant": string, "total": number, "currency": string, "date": "YYYY-MM-DD", "items": [{ "name": string, "price": number }], "warranty_duration": string|null, "return_period": string|null, "warranty_notes": string|null }.
+    If a field cannot be determined, use null. The currency should be the ISO 4217 code (e.g. AED, USD).
+    For warranty_duration: look for warranty periods like "2 years", "1 year", "90 days" etc. on the receipt.
+    For return_period: look for return policy text like "30 days", "14 days", etc.
+    For warranty_notes: any additional warranty or return policy details visible on the receipt.`;
 
     // Send the image to Gemini with automatic model fallback on quota errors
     const result = await withModelFallback((genAI, modelName) => {
@@ -108,8 +111,8 @@ router.post('/parse', authMiddleware, parseLimiter, upload.single('image'), asyn
 });
 
 // Save a receipt
-router.post('/', authMiddleware, validateReceiptInput, async (req, res) => {
-  const { merchant, total, currency, date, items, category_id, notes } = req.body;
+router.post('/', authMiddleware, validateReceiptInput, validateWarrantyInput, async (req, res) => {
+  const { merchant, total, currency, date, items, category_id, notes, warranty_duration, warranty_expiry_date, return_period, return_expiry_date, warranty_notes, extracted_by_gemini } = req.body;
   const userId = req.user.id;
 
   try {
@@ -134,7 +137,13 @@ router.post('/', authMiddleware, validateReceiptInput, async (req, res) => {
         currency: currency || 'AED',
         receipt_date: date,
         items,
-        notes
+        notes,
+        warranty_duration: warranty_duration || null,
+        warranty_expiry_date: warranty_expiry_date || null,
+        return_period: return_period || null,
+        return_expiry_date: return_expiry_date || null,
+        warranty_notes: warranty_notes || null,
+        extracted_by_gemini: extracted_by_gemini || false
       }])
       .select()
       .single();
@@ -207,10 +216,10 @@ router.get('/:id', authMiddleware, validateUUIDParam, async (req, res) => {
 });
 
 // Update a receipt
-router.put('/:id', authMiddleware, validateUUIDParam, validateReceiptInput, async (req, res) => {
+router.put('/:id', authMiddleware, validateUUIDParam, validateReceiptInput, validateWarrantyInput, async (req, res) => {
   const receiptId = req.params.id;
   const userId = req.user.id;
-  const { merchant, total, currency, date, items, category_id, notes } = req.body;
+  const { merchant, total, currency, date, items, category_id, notes, warranty_duration, warranty_expiry_date, return_period, return_expiry_date, warranty_notes } = req.body;
 
   try {
     const { data, error } = await supabase
@@ -222,7 +231,12 @@ router.put('/:id', authMiddleware, validateUUIDParam, validateReceiptInput, asyn
         receipt_date: date,
         items,
         category_id,
-        notes
+        notes,
+        warranty_duration: warranty_duration !== undefined ? warranty_duration : undefined,
+        warranty_expiry_date: warranty_expiry_date !== undefined ? warranty_expiry_date : undefined,
+        return_period: return_period !== undefined ? return_period : undefined,
+        return_expiry_date: return_expiry_date !== undefined ? return_expiry_date : undefined,
+        warranty_notes: warranty_notes !== undefined ? warranty_notes : undefined
       })
       .eq('id', receiptId)
       .eq('user_id', userId)
@@ -253,6 +267,40 @@ router.delete('/:id', authMiddleware, validateUUIDParam, async (req, res) => {
 
     res.json({ message: 'Receipt deleted successfully' });
   } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// GET /warranties — get receipts with active warranties or return periods
+router.get('/warranties/list', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    // Get user's group
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('group_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) throw profileError;
+    if (!profile.group_id) {
+      return res.json([]);
+    }
+
+    // Fetch receipts with non-null warranty or return fields
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('*, categories(name, icon)')
+      .eq('group_id', profile.group_id)
+      .or('warranty_expiry_date.not.is,null,return_expiry_date.not.is,null')
+      .order('receipt_date', { ascending: false });
+
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('Warranties fetch error:', error.message);
     res.status(400).json({ error: error.message });
   }
 });

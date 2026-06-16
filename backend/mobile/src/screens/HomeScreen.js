@@ -1,9 +1,36 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { getReceipts } from '../services/api';
+import { getReceipts, getWarranties } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import ReceiptCard from '../components/ReceiptCard';
+
+/**
+ * Calculate days until a target date.
+ */
+function daysUntil(dateString) {
+  if (!dateString) return null;
+  const target = new Date(dateString);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Get badge config for the dashboard widget.
+ */
+function getWidgetBadge(days) {
+  if (days === null) return null;
+  if (days < 0) return { label: 'Expired', color: '#e74c3c', bg: '#FDEDED' };
+  if (days === 0) return { label: 'Expires Today', color: '#e67e22', bg: '#FFF3E0' };
+  if (days <= 3) return { label: `${days} Day${days > 1 ? 's' : ''}`, color: '#e67e22', bg: '#FFF3E0' };
+  if (days <= 7) return { label: `${days} Days`, color: '#f1c40f', bg: '#FFFDE7' };
+  if (days <= 14) return { label: `${days} Days`, color: '#8bc34a', bg: '#F1F8E9' };
+  if (days <= 30) return { label: `${days} Days`, color: '#4CAF50', bg: '#E8F5E9' };
+  return { label: `${days} Days`, color: '#999', bg: '#f5f5f5' };
+}
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -13,6 +40,10 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const { user } = useContext(AuthContext);
+
+  // Warranty/return dashboard data
+  const [warranties, setWarranties] = useState([]);
+  const [warrantiesLoading, setWarrantiesLoading] = useState(true);
 
   const loadReceipts = async () => {
     try {
@@ -33,37 +64,146 @@ export default function HomeScreen() {
     }
   };
 
+  const loadWarranties = async () => {
+    try {
+      setWarrantiesLoading(true);
+      const data = await getWarranties();
+      setWarranties(data || []);
+    } catch (err) {
+      console.error('Failed to load warranties:', err);
+      setWarranties([]);
+    } finally {
+      setWarrantiesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isFocused) {
       loadReceipts();
+      loadWarranties();
     }
   }, [isFocused]);
 
   const onRefresh = () => {
     setRefreshing(true);
     loadReceipts();
+    loadWarranties();
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  // Build dashboard items from warranty data
+  const expiringReturns = warranties
+    .filter(r => r.return_expiry_date)
+    .map(r => ({
+      ...r,
+      _daysLeft: daysUntil(r.return_expiry_date),
+      _type: 'return',
+    }))
+    .filter(r => r._daysLeft !== null && r._daysLeft <= 14)
+    .sort((a, b) => a._daysLeft - b._daysLeft)
+    .slice(0, 5);
+
+  const expiringWarranties = warranties
+    .filter(r => r.warranty_expiry_date)
+    .map(r => ({
+      ...r,
+      _daysLeft: daysUntil(r.warranty_expiry_date),
+      _type: 'warranty',
+    }))
+    .filter(r => r._daysLeft !== null && r._daysLeft <= 30)
+    .sort((a, b) => a._daysLeft - b._daysLeft)
+    .slice(0, 5);
+
+  const hasDashboardItems = expiringReturns.length > 0 || expiringWarranties.length > 0;
 
   const renderReceiptItem = ({ item }) => (
-    <TouchableOpacity style={styles.receiptItem}>
-      <View style={styles.receiptHeader}>
-        <Text style={styles.merchant}>{item.merchant}</Text>
-        <Text style={styles.amount}>AED {item.total?.toFixed(2)}</Text>
-      </View>
-      <View style={styles.receiptDetails}>
-        <Text style={styles.category}>{item.categories?.name || 'Other'} {item.categories?.icon}</Text>
-        <Text style={styles.date}>{formatDate(item.receipt_date)}</Text>
-      </View>
-    </TouchableOpacity>
+    <ReceiptCard
+      receipt={item}
+      onPress={() => navigation.navigate('ReceiptDetail', { receiptId: item.id })}
+    />
   );
+
+  const renderHeader = () => {
+    if (!hasDashboardItems) return null;
+
+    return (
+      <View style={styles.dashboardContainer}>
+        {/* Dashboard Header */}
+        <View style={styles.dashboardHeader}>
+          <Ionicons name="shield-checkmark" size={18} color="#4CAF50" />
+          <Text style={styles.dashboardTitle}>Warranties & Returns</Text>
+        </View>
+
+        {/* Expiring Returns */}
+        {expiringReturns.length > 0 && (
+          <View style={styles.dashboardSection}>
+            <Text style={styles.dashboardSectionTitle}>
+              <Ionicons name="refresh" size={14} color="#e67e22" /> Returns Expiring Soon
+            </Text>
+            {expiringReturns.map(item => {
+              const badge = getWidgetBadge(item._daysLeft);
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.dashboardItem}
+                  onPress={() => navigation.navigate('ReceiptDetail', { receiptId: item.id })}
+                >
+                  <View style={styles.dashboardItemLeft}>
+                    <Text style={styles.dashboardItemMerchant} numberOfLines={1}>
+                      {item.merchant}
+                    </Text>
+                    <Text style={styles.dashboardItemDate}>
+                      Expires: {item.return_expiry_date}
+                    </Text>
+                  </View>
+                  <View style={[styles.dashboardBadge, { backgroundColor: badge.bg }]}>
+                    <Text style={[styles.dashboardBadgeText, { color: badge.color }]}>
+                      {badge.label}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Expiring Warranties */}
+        {expiringWarranties.length > 0 && (
+          <View style={styles.dashboardSection}>
+            <Text style={styles.dashboardSectionTitle}>
+              <Ionicons name="shield" size={14} color="#4CAF50" /> Warranties Expiring Soon
+            </Text>
+            {expiringWarranties.map(item => {
+              const badge = getWidgetBadge(item._daysLeft);
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.dashboardItem}
+                  onPress={() => navigation.navigate('ReceiptDetail', { receiptId: item.id })}
+                >
+                  <View style={styles.dashboardItemLeft}>
+                    <Text style={styles.dashboardItemMerchant} numberOfLines={1}>
+                      {item.merchant}
+                    </Text>
+                    <Text style={styles.dashboardItemDate}>
+                      Expires: {item.warranty_expiry_date}
+                    </Text>
+                  </View>
+                  <View style={[styles.dashboardBadge, { backgroundColor: badge.bg }]}>
+                    <Text style={[styles.dashboardBadgeText, { color: badge.color }]}>
+                      {badge.label}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Divider */}
+        <View style={styles.dashboardDivider} />
+      </View>
+    );
+  };
 
   if (isLoading && !refreshing) {
     return (
@@ -133,6 +273,7 @@ export default function HomeScreen() {
           data={receipts}
           renderItem={renderReceiptItem}
           keyExtractor={item => item.id}
+          ListHeaderComponent={renderHeader}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -233,45 +374,73 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 80,
   },
-  receiptItem: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+  // Dashboard widget styles
+  dashboardContainer: {
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  receiptHeader: {
+  dashboardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+    gap: 6,
   },
-  merchant: {
+  dashboardTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#333',
   },
-  amount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+  dashboardSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  receiptDetails: {
+  dashboardSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 10,
+  },
+  dashboardItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
-  category: {
-    fontSize: 14,
-    color: '#666',
+  dashboardItemLeft: {
+    flex: 1,
+    marginRight: 10,
   },
-  date: {
+  dashboardItemMerchant: {
     fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  dashboardItemDate: {
+    fontSize: 12,
     color: '#999',
+    marginTop: 2,
+  },
+  dashboardBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  dashboardBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dashboardDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 8,
   },
   fab: {
     position: 'absolute',

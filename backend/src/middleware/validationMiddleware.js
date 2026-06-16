@@ -369,6 +369,66 @@ function validateConversationHistory(req, res, next) {
   next();
 }
 
+/**
+ * Validate warranty & return fields
+ */
+const { WARRANTY_VALIDATION } = require('../config/constants');
+
+function validateWarrantyInput(req, res, next) {
+  const { warranty_duration, return_period, warranty_notes } = req.body || {};
+
+  if (warranty_duration !== undefined && warranty_duration !== null) {
+    if (typeof warranty_duration !== 'string' || warranty_duration.length > WARRANTY_VALIDATION.MAX_WARRANTY_DURATION_LENGTH) {
+      return res.status(400).json({
+        error: 'Invalid warranty duration',
+        message: `Warranty duration must be at most ${WARRANTY_VALIDATION.MAX_WARRANTY_DURATION_LENGTH} characters`
+      });
+    }
+  }
+
+  if (return_period !== undefined && return_period !== null) {
+    if (typeof return_period !== 'string' || return_period.length > WARRANTY_VALIDATION.MAX_RETURN_PERIOD_LENGTH) {
+      return res.status(400).json({
+        error: 'Invalid return period',
+        message: `Return period must be at most ${WARRANTY_VALIDATION.MAX_RETURN_PERIOD_LENGTH} characters`
+      });
+    }
+  }
+
+  if (warranty_notes !== undefined && warranty_notes !== null) {
+    if (typeof warranty_notes !== 'string' || warranty_notes.length > WARRANTY_VALIDATION.MAX_WARRANTY_NOTES_LENGTH) {
+      return res.status(400).json({
+        error: 'Invalid warranty notes',
+        message: `Warranty notes must be at most ${WARRANTY_VALIDATION.MAX_WARRANTY_NOTES_LENGTH} characters`
+      });
+    }
+  }
+
+  // Validate warranty_expiry_date format if provided
+  if (req.body.warranty_expiry_date !== undefined && req.body.warranty_expiry_date !== null) {
+    const d = new Date(req.body.warranty_expiry_date);
+    if (isNaN(d.getTime())) {
+      return res.status(400).json({
+        error: 'Invalid warranty expiry date',
+        message: 'warranty_expiry_date must be a valid date'
+      });
+    }
+  }
+
+  // Validate return_expiry_date format if provided
+  if (req.body.return_expiry_date !== undefined && req.body.return_expiry_date !== null) {
+    const d = new Date(req.body.return_expiry_date);
+    if (isNaN(d.getTime())) {
+      return res.status(400).json({
+        error: 'Invalid return expiry date',
+        message: 'return_expiry_date must be a valid date'
+      });
+    }
+  }
+
+  next();
+}
+
 module.exports = {
   validateJsonPayload,
   sanitizeInput,
@@ -380,5 +440,6 @@ module.exports = {
   validateUUID,
   validateUUIDParam,
   validateConversationHistory,
+  validateWarrantyInput,
   FIELD_LIMITS,
 };
