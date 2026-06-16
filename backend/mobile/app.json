@@ -7,7 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Allow Receipt Tracker to use your microphone for voice input."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -15,19 +18,16 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store",
-      [
-        "@react-native-voice/voice",
-        {
-          "microphonePermission": "Allow Receipt Tracker to use your microphone for voice input."
-        }
-      ]
+      "expo-secure-store"
     ]
   }
 }
