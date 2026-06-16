@@ -1,15 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const authMiddleware = require('../middleware/authMiddleware');
 const { validateReceiptInput, validateQueryParams, validateUUIDParam } = require('../middleware/validationMiddleware');
 const { RATE_LIMITS } = require('../config/constants');
+const { withModelFallback } = require('../config/gemini');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Rate limiter for receipt parsing (costly Gemini API calls)
 const parseLimiter = rateLimit({
@@ -45,30 +44,19 @@ router.post('/parse', authMiddleware, parseLimiter, upload.single('image'), asyn
     const imageBase64 = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
 
-    // Get the Gemini model
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
     // Prepare the prompt
     const prompt = `You are a receipt parser. Extract the following from the receipt image and return ONLY valid JSON with no markdown, no explanation:
     { "merchant": string, "total": number, "currency": string, "date": "YYYY-MM-DD", "items": [{ "name": string, "price": number }] }.
     If a field cannot be determined, use null. The currency should be the ISO 4217 code (e.g. AED, USD).`;
 
-    // Send the image to Gemini (with 30s timeout)
-    const geminiPromise = model.generateContent([
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType: mimeType
-        }
-      },
-      {
-        text: prompt
-      }
-    ]);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini API request timed out')), 30000)
-    );
-    const result = await Promise.race([geminiPromise, timeoutPromise]);
+    // Send the image to Gemini with automatic model fallback on quota errors
+    const result = await withModelFallback((genAI, modelName) => {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      return model.generateContent([
+        { inlineData: { data: imageBase64, mimeType } },
+        { text: prompt },
+      ]);
+    });
 
     const responseText = result.response.text();
     console.log('Gemini raw response:', responseText.substring(0, 500));
@@ -105,7 +93,13 @@ router.post('/parse', authMiddleware, parseLimiter, upload.single('image'), asyn
       data: parsedData
     });
   } catch (error) {
-    console.error('Gemini API error:', error);
+    console.error('Gemini API error:', error.message);
+    if (error.code === 'ALL_MODELS_EXHAUSTED') {
+      return res.status(503).json({
+        error: 'Service temporarily unavailable',
+        message: 'The server is overloaded. Please try again later.'
+      });
+    }
     res.status(500).json({
       error: 'Failed to process receipt image',
       details: error.message

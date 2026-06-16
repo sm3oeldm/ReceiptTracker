@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const authMiddleware = require('../middleware/authMiddleware');
 const { validateConversationHistory } = require('../middleware/validationMiddleware');
 const { RATE_LIMITS } = require('../config/constants');
+const { withModelFallback } = require('../config/gemini');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter for AI assistant (paid Gemini API calls)
@@ -219,28 +220,27 @@ ${contextString}`;
       parts: [{ text: msg.content }]
     }));
 
-    // Call Gemini API
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: systemPrompt,
+    // Call Gemini API with automatic model fallback on quota errors
+    const result = await withModelFallback(async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
+      });
+      const chat = model.startChat({ history });
+      return chat.sendMessage(message.trim());
     });
-
-    const chat = model.startChat({ history });
-
-    // Send message with 30s timeout
-    const geminiPromise = chat.sendMessage(message.trim());
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini API request timed out')), 30000)
-    );
-    const result = await Promise.race([geminiPromise, timeoutPromise]);
     const reply = result.response.text();
 
     res.json({ reply });
   } catch (error) {
     console.error('Assistant error:', error.message);
+    if (error.code === 'ALL_MODELS_EXHAUSTED') {
+      return res.status(503).json({
+        error: 'Service temporarily unavailable',
+        message: 'The server is overloaded. Please try again later.',
+        code: 'ALL_MODELS_EXHAUSTED'
+      });
+    }
     if (error.status === 401 || error.status === 403) {
       return res.status(500).json({ error: 'AI service configuration error', code: 'AI_AUTH_ERROR' });
     }
