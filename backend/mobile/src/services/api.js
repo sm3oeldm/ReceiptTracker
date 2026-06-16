@@ -193,6 +193,41 @@ export const getWarranties = async () => {
   }
 };
 
+// Transcribe audio using Gemini
+export const transcribeAudio = async (audioUri, mimeType = 'audio/mp4') => {
+  let token;
+  try {
+    token = await SecureStore.getItemAsync('userToken');
+  } catch (e) {}
+
+  const formData = new FormData();
+  formData.append('audio', {
+    uri: audioUri,
+    type: mimeType,
+    name: 'recording.m4a',
+  });
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}assistant/transcribe`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error(error.message || 'Network error');
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    if (response.status === 401 && onAuthError) onAuthError();
+    throw new Error(data.error || 'Transcription failed');
+  }
+
+  return data.text;
+};
+
 // Chat with AI spending assistant
 export const chatWithAssistant = async (message, conversationHistory) => {
   try {

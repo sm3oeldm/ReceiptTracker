@@ -6,6 +6,7 @@ const { validateConversationHistory } = require('../middleware/validationMiddlew
 const { RATE_LIMITS } = require('../config/constants');
 const { withModelFallback } = require('../config/gemini');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
 
 // Rate limiter for AI assistant (paid Gemini API calls)
 const assistantLimiter = rateLimit({
@@ -14,6 +15,20 @@ const assistantLimiter = rateLimit({
   message: { success: false, error: 'Too many AI assistant requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// Multer config for audio uploads (in-memory, 10MB max)
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/wav', 'audio/amr', 'audio/mpeg', 'audio/aac', 'audio/ogg'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid audio type: ${file.mimetype}. Allowed: MP4, M4A, WAV, AMR, MP3, AAC, OGG`));
+    }
+  }
 });
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
@@ -245,6 +260,52 @@ ${contextString}`;
       return res.status(500).json({ error: 'AI service configuration error', code: 'AI_AUTH_ERROR' });
     }
     res.status(500).json({ error: 'Failed to process request', code: 'AI_ERROR' });
+  }
+});
+
+/**
+ * POST /api/assistant/transcribe
+ * Transcribe audio using Gemini.
+ */
+router.post('/transcribe', authMiddleware, assistantLimiter, audioUpload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided', code: 'MISSING_AUDIO' });
+    }
+
+    const base64Audio = req.file.buffer.toString('base64');
+    const mimeType = req.file.mimetype;
+
+    console.log(`🎤 Transcribing audio: ${(req.file.size / 1024).toFixed(1)}KB (${mimeType})`);
+
+    const result = await withModelFallback(async (genAI, modelName) => {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent([
+        "Transcribe the audio precisely. Output only the transcribed text, nothing else. If you cannot understand the audio, output an empty string.",
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Audio
+          }
+        }
+      ]);
+      return result.response.text();
+    });
+
+    const text = result.trim();
+    console.log(`📝 Transcribed: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}"`);
+
+    res.json({ text });
+  } catch (error) {
+    console.error('Transcription error:', error.message);
+    if (error.code === 'ALL_MODELS_EXHAUSTED') {
+      return res.status(503).json({
+        error: 'Service temporarily unavailable',
+        message: 'The server is overloaded. Please try again later.',
+        code: 'ALL_MODELS_EXHAUSTED'
+      });
+    }
+    res.status(500).json({ error: 'Transcription failed', code: 'TRANSCRIBE_ERROR' });
   }
 });
 

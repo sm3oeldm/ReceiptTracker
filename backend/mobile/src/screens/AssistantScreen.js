@@ -14,25 +14,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
-import Constants from 'expo-constants';
-import { chatWithAssistant } from '../services/api';
+import { Audio } from 'expo-av';
+import { chatWithAssistant, transcribeAudio } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
-
-// Detect whether we're running in Expo Go (voice not supported)
-const isExpoGo = Constants.appOwnership === 'expo';
-
-// Lazily-loaded Voice module — never required in Expo Go
-let VoiceModule = null;
-function getVoiceModule() {
-  if (!VoiceModule && !isExpoGo) {
-    try {
-      VoiceModule = require('@react-native-voice/voice').default;
-    } catch {
-      VoiceModule = null;
-    }
-  }
-  return VoiceModule;
-}
 
 const SUGGESTIONS = [
   "How much did I spend this month?",
@@ -89,7 +73,7 @@ function TypingDots({ colors }) {
   });
 
   return (
-    <View style={[styles.typingDots, { borderTopColor: colors.border }]}>
+    <View style={styles.typingDots}>
       <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot1)]}>●</Animated.Text>
       <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot2)]}>●</Animated.Text>
       <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot3)]}>●</Animated.Text>
@@ -103,12 +87,13 @@ export default function AssistantScreen() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [hasSentMessage, setHasSentMessage] = useState(false);
-  const [voiceAvailable, setVoiceAvailable] = useState(!isExpoGo);
 
   const scrollViewRef = useRef(null);
+  const recordingRef = useRef(null);
 
   // Welcome message on first mount
   useEffect(() => {
@@ -132,22 +117,9 @@ export default function AssistantScreen() {
     }
   }, [messages]);
 
-  // Voice input setup (only in dev builds, never in Expo Go)
+  // Request audio recording permissions on mount
   useEffect(() => {
-    const Voice = getVoiceModule();
-    if (!Voice) return;
-
-    Voice.onSpeechResults = (e) => {
-      const transcript = e.value?.[0] || '';
-      setInputText(transcript);
-      setIsListening(false);
-    };
-
-    Voice.onSpeechError = () => setIsListening(false);
-
-    return () => {
-      Voice.destroy().then(Voice.removeAllListeners).catch(() => {});
-    };
+    Audio.requestPermissionsAsync().catch(() => {});
   }, []);
 
   const sendMessage = async (text) => {
@@ -165,7 +137,7 @@ export default function AssistantScreen() {
     setIsLoading(true);
     setHasSentMessage(true);
 
-    // Build conversation history for API (exclude welcome message, exclude id/timestamp fields)
+    // Build conversation history for API (exclude welcome message)
     const history = messages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .filter(m => !m.isWelcome)
@@ -226,34 +198,80 @@ export default function AssistantScreen() {
     });
   };
 
-  const startListening = async () => {
+  const startRecording = async () => {
     try {
-      const Voice = getVoiceModule();
-      if (!Voice) return;
-      setInputText('');
-      setIsListening(true);
-      await Voice.start('en-US');
-    } catch (e) {
-      setIsListening(false);
+      // Ensure we have permission
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
+      await recording.startAsync();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      setIsRecording(false);
     }
   };
 
-  const stopListening = async () => {
+  const stopRecording = async () => {
+    const recording = recordingRef.current;
+    if (!recording) return;
+
     try {
-      const Voice = getVoiceModule();
-      if (!Voice) return;
-      await Voice.stop();
-      setIsListening(false);
-    } catch {
-      setIsListening(false);
+      setIsRecording(false);
+      setIsTranscribing(true);
+
+      await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      const uri = recording.getURI();
+      recordingRef.current = null;
+
+      if (!uri) {
+        setIsTranscribing(false);
+        return;
+      }
+
+      // Determine MIME type from extension
+      const ext = uri.split('.').pop()?.toLowerCase();
+      const mimeType = ext === 'wav' ? 'audio/wav'
+        : ext === 'amr' ? 'audio/amr'
+        : ext === 'mp3' ? 'audio/mpeg'
+        : ext === 'ogg' ? 'audio/ogg'
+        : 'audio/mp4';
+
+      const text = await transcribeAudio(uri, mimeType);
+      setIsTranscribing(false);
+
+      if (text) {
+        setInputText(text);
+        // Auto-send short queries (less than ~100 chars)
+        if (text.length < 100) {
+          setTimeout(() => sendMessage(text), 300);
+        }
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      setIsTranscribing(false);
     }
   };
 
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
     } else {
-      startListening();
+      startRecording();
     }
   };
 
@@ -347,20 +365,18 @@ export default function AssistantScreen() {
         )}
       </ScrollView>
 
-      {/* Voice/Speaking status bar */}
-      {(isListening || isSpeaking) && (
+      {/* Recording / Speaking status bar */}
+      {(isRecording || isSpeaking || isTranscribing) && (
         <View style={s.voiceStatusBar}>
-          {isListening ? (
-            <>
-              <Text style={s.voiceStatusText}>🎙️ Listening... (tap mic to stop)</Text>
-            </>
+          {isRecording ? (
+            <Text style={s.voiceStatusText}>🎙️ Recording... (tap mic to stop)</Text>
+          ) : isTranscribing ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <ActivityIndicator size="small" color={colors.warning} />
+              <Text style={s.voiceStatusText}>Transcribing...</Text>
+            </View>
           ) : (
-            <TouchableOpacity
-              onPress={() => {
-                Speech.stop();
-                setIsSpeaking(false);
-              }}
-            >
+            <TouchableOpacity onPress={() => { Speech.stop(); setIsSpeaking(false); }}>
               <Text style={s.voiceStatusText}>🔊 Speaking... (tap to stop)</Text>
             </TouchableOpacity>
           )}
@@ -369,22 +385,17 @@ export default function AssistantScreen() {
 
       {/* Input row */}
       <View style={s.inputContainer}>
-        {voiceAvailable ? (
-          <TouchableOpacity
-            style={[s.micButton, isListening && s.micButtonActive]}
-            onPress={toggleListening}
-          >
-            <Ionicons
-              name={isListening ? 'mic' : 'mic-outline'}
-              size={24}
-              color={isListening ? colors.danger : colors.textSecondary}
-            />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={s.micButton} disabled>
-            <Ionicons name="mic-off-outline" size={24} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[s.micButton, (isRecording || isTranscribing) && s.micButtonActive]}
+          onPress={toggleRecording}
+          disabled={isTranscribing}
+        >
+          <Ionicons
+            name={isRecording ? 'mic' : 'mic-outline'}
+            size={24}
+            color={isRecording ? colors.danger : colors.textSecondary}
+          />
+        </TouchableOpacity>
 
         <TextInput
           style={s.textInput}
@@ -393,7 +404,7 @@ export default function AssistantScreen() {
           value={inputText}
           onChangeText={setInputText}
           multiline
-          editable={!isLoading && !isListening}
+          editable={!isLoading && !isRecording}
           maxLength={1000}
         />
 
@@ -409,10 +420,6 @@ export default function AssistantScreen() {
           />
         </TouchableOpacity>
       </View>
-
-      {!voiceAvailable && (
-        <Text style={s.voiceNote}>Voice requires Expo Dev Build</Text>
-      )}
     </KeyboardAvoidingView>
   );
 }
@@ -599,12 +606,5 @@ const makeStyles = (c) => StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: c.border,
-  },
-  voiceNote: {
-    textAlign: 'center',
-    fontSize: 11,
-    color: c.textMuted,
-    paddingBottom: 4,
-    backgroundColor: c.bg,
   },
 });
