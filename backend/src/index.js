@@ -92,6 +92,7 @@ const groupsRoutes = require('./routes/groups');
 const categoriesRoutes = require('./routes/categories');
 const receiptsRoutes = require('./routes/receipts');
 const reportsRoutes = require('./routes/reports');
+const assistantRoutes = require('./routes/assistant');
 
 // ==== Apply Route Middleware ====
 
@@ -112,6 +113,7 @@ app.use('/api/groups', groupsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/receipts', receiptsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 // ==== Health Check ====
 

@@ -162,3 +162,18 @@ export const createReceipt = async (receiptData) => {
     throw new Error(error.message);
   }
 };
+
+// Chat with AI spending assistant
+export const chatWithAssistant = async (message, conversationHistory) => {
+  try {
+    return await authFetch('assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        conversation_history: conversationHistory,
+      }),
+    });
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};

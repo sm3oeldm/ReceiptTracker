@@ -14,6 +14,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import GroupScreen from './src/screens/GroupScreen';
+import AssistantScreen from './src/screens/AssistantScreen';
 import ReceiptConfirmScreen from './src/screens/ReceiptConfirmScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
@@ -46,6 +47,8 @@ function AppTabs() {
             iconName = focused ? 'stats-chart' : 'stats-chart-outline';
           } else if (route.name === 'Group') {
             iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Assistant') {
+            iconName = focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -58,6 +61,7 @@ function AppTabs() {
       <Tab.Screen name="Scan" component={ScanScreen} />
       <Tab.Screen name="Report" component={ReportScreen} />
       <Tab.Screen name="Group" component={GroupScreen} />
+      <Tab.Screen name="Assistant" component={AssistantScreen} />
     </Tab.Navigator>
   );
 }
