@@ -5,14 +5,16 @@
  */
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Free-tier eligible Gemini models, ordered by preference (best first)
+// Free-tier eligible Gemini models, ordered by preference (best first).
+// As of June 2026, Gemini 2.0 Flash and 2.0 Flash-Lite were shut down.
+// 1.5-series models are no longer on the current pricing page.
+// Source: https://ai.google.dev/gemini-api/docs/pricing
 const FREE_MODELS = [
   'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview',
 ];
 
 // HTTP status codes that indicate quota / rate-limit exhaustion
