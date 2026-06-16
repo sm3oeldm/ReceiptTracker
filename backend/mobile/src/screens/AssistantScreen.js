@@ -14,7 +14,24 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import Constants from 'expo-constants';
 import { chatWithAssistant } from '../services/api';
+
+// Detect whether we're running in Expo Go (voice not supported)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Lazily-loaded Voice module — never required in Expo Go
+let VoiceModule = null;
+function getVoiceModule() {
+  if (!VoiceModule && !isExpoGo) {
+    try {
+      VoiceModule = require('@react-native-voice/voice').default;
+    } catch {
+      VoiceModule = null;
+    }
+  }
+  return VoiceModule;
+}
 
 const SUGGESTIONS = [
   "How much did I spend this month?",
@@ -86,26 +103,9 @@ export default function AssistantScreen() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [hasSentMessage, setHasSentMessage] = useState(false);
-  const [voiceAvailable, setVoiceAvailable] = useState(true);
+  const [voiceAvailable, setVoiceAvailable] = useState(!isExpoGo);
 
   const scrollViewRef = useRef(null);
-
-  // Track if voice is available (not in Expo Go)
-  useEffect(() => {
-    let isMounted = true;
-    const checkVoice = async () => {
-      try {
-        const Voice = require('@react-native-voice/voice').default;
-        if (Voice) {
-          setVoiceAvailable(true);
-        }
-      } catch {
-        if (isMounted) setVoiceAvailable(false);
-      }
-    };
-    checkVoice();
-    return () => { isMounted = false; };
-  }, []);
 
   // Welcome message on first mount
   useEffect(() => {
@@ -129,14 +129,10 @@ export default function AssistantScreen() {
     }
   }, [messages]);
 
-  // Voice input setup
+  // Voice input setup (only in dev builds, never in Expo Go)
   useEffect(() => {
-    let Voice;
-    try {
-      Voice = require('@react-native-voice/voice').default;
-    } catch {
-      return;
-    }
+    const Voice = getVoiceModule();
+    if (!Voice) return;
 
     Voice.onSpeechResults = (e) => {
       const transcript = e.value?.[0] || '';
@@ -229,7 +225,8 @@ export default function AssistantScreen() {
 
   const startListening = async () => {
     try {
-      const Voice = require('@react-native-voice/voice').default;
+      const Voice = getVoiceModule();
+      if (!Voice) return;
       setInputText('');
       setIsListening(true);
       await Voice.start('en-US');
@@ -240,7 +237,8 @@ export default function AssistantScreen() {
 
   const stopListening = async () => {
     try {
-      const Voice = require('@react-native-voice/voice').default;
+      const Voice = getVoiceModule();
+      if (!Voice) return;
       await Voice.stop();
       setIsListening(false);
     } catch {

@@ -77,19 +77,19 @@ router.post('/chat', authMiddleware, async (req, res) => {
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
 
-    // Query 1 — All receipts (last 12 months) with category and profile joins
+    // Query 1 — All receipts (last 12 months) with category join (no profiles join — no FK in schema)
     const { data: rawReceipts, error: receiptsError } = await supabase
       .from('receipts')
       .select(`
         id,
+        user_id,
         merchant,
         total,
         currency,
         receipt_date,
         items,
         notes,
-        categories ( name ),
-        profiles ( display_name )
+        categories ( name )
       `)
       .eq('group_id', groupId)
       .gte('receipt_date', twelveMonthsAgo.toISOString())
@@ -100,11 +100,24 @@ router.post('/chat', authMiddleware, async (req, res) => {
       throw receiptsError;
     }
 
-    // Flatten joined fields from Supabase nested result
+    // Fetch display names for all unique user_ids in receipts
+    const receiptUserIds = [...new Set((rawReceipts || []).map(r => r.user_id).filter(Boolean))];
+    const userDisplayNames = {};
+    if (receiptUserIds.length > 0) {
+      const { data: users } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', receiptUserIds);
+      if (users) {
+        users.forEach(u => { userDisplayNames[u.id] = u.display_name; });
+      }
+    }
+
+    // Flatten joined fields and map display names
     let receipts = (rawReceipts || []).map(r => ({
       ...r,
       category_name: r.categories?.name || null,
-      member_name: r.profiles?.display_name || null
+      member_name: userDisplayNames[r.user_id] || null
     }));
 
     // Token safety guard — keep only most recent 200 receipts
@@ -132,18 +145,28 @@ router.post('/chat', authMiddleware, async (req, res) => {
 
     const { data: currentMonthReceipts, error: currentMonthError } = await supabase
       .from('receipts')
-      .select(`
-        total,
-        profiles ( display_name )
-      `)
+      .select('user_id, total')
       .eq('group_id', groupId)
       .gte('receipt_date', currentMonthStart);
 
     let memberData = [];
     if (!currentMonthError && currentMonthReceipts) {
+      // Build a name lookup for current-month user_ids
+      const currentUserIds = [...new Set(currentMonthReceipts.map(r => r.user_id).filter(Boolean))];
+      const currentNames = {};
+      if (currentUserIds.length > 0) {
+        const { data: currentUsers } = await supabase
+          .from('profiles')
+          .select('id, display_name')
+          .in('id', currentUserIds);
+        if (currentUsers) {
+          currentUsers.forEach(u => { currentNames[u.id] = u.display_name; });
+        }
+      }
+
       const memberMap = {};
       currentMonthReceipts.forEach(r => {
-        const name = r.profiles?.display_name || 'Unknown';
+        const name = currentNames[r.user_id] || 'Unknown';
         if (!memberMap[name]) {
           memberMap[name] = { member_name: name, total_spent: 0, receipt_count: 0 };
         }
