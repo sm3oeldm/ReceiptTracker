@@ -293,7 +293,7 @@ router.get('/warranties/list', authMiddleware, async (req, res) => {
       .from('receipts')
       .select('*, categories(name, icon)')
       .eq('group_id', profile.group_id)
-      .or('warranty_expiry_date.not.is,null,return_expiry_date.not.is,null')
+      .or('warranty_expiry_date.not.is.null,return_expiry_date.not.is.null')
       .order('receipt_date', { ascending: false });
 
     if (error) throw error;

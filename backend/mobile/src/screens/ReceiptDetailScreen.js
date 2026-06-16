@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getReceiptById, updateReceipt } from '../services/api';
+import { getReceiptById } from '../services/api';
 
 /**
  * Calculate days remaining until an expiry date.
@@ -38,31 +38,13 @@ export default function ReceiptDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  // Receipt fields
   const [receipt, setReceipt] = useState(null);
-
-  // Editable warranty fields
-  const [warrantyDuration, setWarrantyDuration] = useState('');
-  const [warrantyExpiry, setWarrantyExpiry] = useState('');
-  const [returnPeriod, setReturnPeriod] = useState('');
-  const [returnExpiry, setReturnExpiry] = useState('');
-  const [warrantyNotes, setWarrantyNotes] = useState('');
-  const [hasChanges, setHasChanges] = useState(false);
 
   const loadReceipt = useCallback(async () => {
     try {
       setError(null);
       const data = await getReceiptById(receiptId);
       setReceipt(data);
-      setWarrantyDuration(data.warranty_duration || '');
-      setWarrantyExpiry(data.warranty_expiry_date || '');
-      setReturnPeriod(data.return_period || '');
-      setReturnExpiry(data.return_expiry_date || '');
-      setReturnExpiry(data.return_expiry_date || '');
-      setWarrantyNotes(data.warranty_notes || '');
-      setHasChanges(false);
     } catch (err) {
       console.error('Load receipt error:', err);
       setError(err.message);
@@ -79,27 +61,6 @@ export default function ReceiptDetailScreen({ route, navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     loadReceipt();
-  };
-
-  const markChanged = () => setHasChanges(true);
-
-  const handleSaveWarranty = async () => {
-    try {
-      setSaving(true);
-      await updateReceipt(receiptId, {
-        warranty_duration: warrantyDuration.trim() || null,
-        warranty_expiry_date: warrantyExpiry.trim() || null,
-        return_period: returnPeriod.trim() || null,
-        return_expiry_date: returnExpiry.trim() || null,
-        warranty_notes: warrantyNotes.trim() || null,
-      });
-      setHasChanges(false);
-      Alert.alert('Saved', 'Warranty and return info updated.');
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to save changes');
-    } finally {
-      setSaving(false);
-    }
   };
 
   if (loading) {
@@ -131,6 +92,7 @@ export default function ReceiptDetailScreen({ route, navigation }) {
   const returnBadge = receipt.return_expiry_date ? getBadge(returnDays, 'return') : null;
   const warrantyBadge = receipt.warranty_expiry_date ? getBadge(warrantyDays, 'warranty') : null;
   const currency = receipt.currency || 'AED';
+  const hasWarrantyData = receipt.warranty_duration || receipt.warranty_expiry_date || receipt.return_period || receipt.return_expiry_date || receipt.warranty_notes;
 
   return (
     <View style={styles.container}>
@@ -194,148 +156,58 @@ export default function ReceiptDetailScreen({ route, navigation }) {
         )}
 
         {/* Warranty & Return Status */}
-        {(returnBadge || warrantyBadge || receipt.warranty_duration || receipt.return_period) && (
+        {hasWarrantyData && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
-              <Ionicons name="shield-checkmark" size={16} color="#333" /> Warranty & Return Status
+              <Ionicons name="shield-checkmark" size={16} color="#333" /> Warranty & Return
             </Text>
 
+            {receipt.warranty_duration && (
+              <View style={styles.warrantyRow}>
+                <Ionicons name="shield-outline" size={16} color="#666" />
+                <Text style={styles.warrantyRowText}>Warranty: {receipt.warranty_duration}</Text>
+              </View>
+            )}
+
+            {receipt.return_period && (
+              <View style={styles.warrantyRow}>
+                <Ionicons name="refresh-outline" size={16} color="#666" />
+                <Text style={styles.warrantyRowText}>Return: {receipt.return_period}</Text>
+              </View>
+            )}
+
             {returnBadge && (
-              <View style={[styles.statusBadge, { backgroundColor: returnBadge.bg }]}>
+              <View style={[styles.statusBadge, { backgroundColor: returnBadge.bg, marginTop: returnBadge ? 10 : 0 }]}>
                 <Ionicons name={returnBadge.icon} size={18} color={returnBadge.color} />
                 <View style={styles.statusContent}>
                   <Text style={[styles.statusLabel, { color: returnBadge.color }]}>{returnBadge.label}</Text>
-                  {receipt.return_period && (
-                    <Text style={styles.statusDetail}>Return period: {receipt.return_period}</Text>
+                  {receipt.return_expiry_date && (
+                    <Text style={styles.statusDetail}>Return deadline: {receipt.return_expiry_date}</Text>
                   )}
                 </View>
               </View>
             )}
 
             {warrantyBadge && (
-              <View style={[styles.statusBadge, { backgroundColor: warrantyBadge.bg, marginTop: 8 }]}>
+              <View style={[styles.statusBadge, { backgroundColor: warrantyBadge.bg, marginTop: 10 }]}>
                 <Ionicons name={warrantyBadge.icon} size={18} color={warrantyBadge.color} />
                 <View style={styles.statusContent}>
                   <Text style={[styles.statusLabel, { color: warrantyBadge.color }]}>{warrantyBadge.label}</Text>
-                  {receipt.warranty_duration && (
-                    <Text style={styles.statusDetail}>Warranty: {receipt.warranty_duration}</Text>
+                  {receipt.warranty_expiry_date && (
+                    <Text style={styles.statusDetail}>Warranty expires: {receipt.warranty_expiry_date}</Text>
                   )}
                 </View>
               </View>
             )}
+
+            {receipt.warranty_notes && (
+              <View style={styles.notesBox}>
+                <Ionicons name="document-text" size={16} color="#666" />
+                <Text style={styles.notesText}>{receipt.warranty_notes}</Text>
+              </View>
+            )}
           </View>
         )}
-
-        {/* Edit Warranty & Return */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            <Ionicons name="create" size={16} color="#333" /> Edit Warranty & Return
-          </Text>
-
-          <Text style={styles.inputLabel}>Warranty Duration</Text>
-          <TextInput
-            style={styles.input}
-            value={warrantyDuration}
-            onChangeText={v => { setWarrantyDuration(v); markChanged(); }}
-            placeholder="e.g. 2 years, 90 days"
-          />
-
-          <Text style={styles.inputLabel}>Warranty Expiry Date</Text>
-          <TextInput
-            style={styles.input}
-            value={warrantyExpiry}
-            onChangeText={v => { setWarrantyExpiry(v); markChanged(); }}
-            placeholder="YYYY-MM-DD"
-          />
-
-          <Text style={styles.inputLabel}>Return Period</Text>
-          <TextInput
-            style={styles.input}
-            value={returnPeriod}
-            onChangeText={v => { setReturnPeriod(v); markChanged(); }}
-            placeholder="e.g. 14 days, 30 days"
-          />
-
-          <Text style={styles.inputLabel}>Return Expiry Date</Text>
-          <TextInput
-            style={styles.input}
-            value={returnExpiry}
-            onChangeText={v => { setReturnExpiry(v); markChanged(); }}
-            placeholder="YYYY-MM-DD"
-          />
-
-          <Text style={styles.inputLabel}>Warranty Notes</Text>
-          <TextInput
-            style={[styles.input, styles.notesInput]}
-            value={warrantyNotes}
-            onChangeText={v => { setWarrantyNotes(v); markChanged(); }}
-            placeholder="Additional warranty details..."
-            multiline
-          />
-
-          {hasChanges && (
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && styles.savingBtn]}
-              onPress={handleSaveWarranty}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <>
-                  <Ionicons name="save" size={18} color="white" />
-                  <Text style={styles.saveBtnText}>  Save Changes</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {/* Clear warranty data button */}
-          {(warrantyDuration || returnPeriod || warrantyNotes) && !hasChanges && (
-            <TouchableOpacity
-              style={styles.clearBtn}
-              onPress={() => {
-                Alert.alert(
-                  'Clear Warranty Data',
-                  'Remove all warranty and return info for this receipt?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Clear',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          setSaving(true);
-                          await updateReceipt(receiptId, {
-                            warranty_duration: null,
-                            warranty_expiry_date: null,
-                            return_period: null,
-                            return_expiry_date: null,
-                            warranty_notes: null,
-                          });
-                          setWarrantyDuration('');
-                          setWarrantyExpiry('');
-                          setReturnPeriod('');
-                          setReturnExpiry('');
-                          setWarrantyNotes('');
-                          Alert.alert('Cleared', 'Warranty and return data removed.');
-                        } catch (err) {
-                          Alert.alert('Error', err.message);
-                        } finally {
-                          setSaving(false);
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
-              disabled={saving}
-            >
-              <Ionicons name="trash-outline" size={16} color="#e74c3c" />
-              <Text style={styles.clearBtnText}>  Clear Warranty Data</Text>
-            </TouchableOpacity>
-          )}
-        </View>
 
         {receipt.extracted_by_gemini && (
           <View style={styles.aiBadge}>
@@ -473,6 +345,17 @@ const styles = StyleSheet.create({
     color: '#555',
     marginLeft: 10,
   },
+  // Warranty rows
+  warrantyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  warrantyRowText: {
+    fontSize: 14,
+    color: '#555',
+  },
   // Status badges
   statusBadge: {
     flexDirection: 'row',
@@ -492,58 +375,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     marginTop: 2,
-  },
-  // Inputs
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#555',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  input: {
-    height: 44,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 15,
-    backgroundColor: '#fafafa',
-    color: '#333',
-  },
-  notesInput: {
-    height: 80,
-    textAlignVertical: 'top',
-    paddingTop: 10,
-  },
-  saveBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  savingBtn: {
-    opacity: 0.7,
-  },
-  saveBtnText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  clearBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginTop: 12,
-  },
-  clearBtnText: {
-    color: '#e74c3c',
-    fontSize: 14,
-    fontWeight: '500',
   },
   errorTitle: {
     fontSize: 20,
