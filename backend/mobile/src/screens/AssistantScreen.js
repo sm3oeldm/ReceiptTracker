@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import Constants from 'expo-constants';
 import { chatWithAssistant } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 // Detect whether we're running in Expo Go (voice not supported)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -39,7 +40,7 @@ const SUGGESTIONS = [
   "Where did I buy the cheapest groceries?"
 ];
 
-function TypingDots() {
+function TypingDots({ colors }) {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -88,15 +89,17 @@ function TypingDots() {
   });
 
   return (
-    <View style={styles.typingDots}>
-      <Animated.Text style={[styles.dot, getOpacity(dot1)]}>●</Animated.Text>
-      <Animated.Text style={[styles.dot, getOpacity(dot2)]}>●</Animated.Text>
-      <Animated.Text style={[styles.dot, getOpacity(dot3)]}>●</Animated.Text>
+    <View style={[styles.typingDots, { borderTopColor: colors.border }]}>
+      <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot1)]}>●</Animated.Text>
+      <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot2)]}>●</Animated.Text>
+      <Animated.Text style={[styles.dot, { color: colors.textMuted }, getOpacity(dot3)]}>●</Animated.Text>
     </View>
   );
 }
 
 export default function AssistantScreen() {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -261,34 +264,35 @@ export default function AssistantScreen() {
   const renderMessageBubble = (msg) => {
     const isUser = msg.role === 'user';
     const isAssistant = msg.role === 'assistant';
+    const isError = msg.isError;
 
     return (
-      <View key={msg.id} style={[styles.bubbleRow, isUser ? styles.userRow : styles.assistantRow]}>
+      <View key={msg.id} style={[s.bubbleRow, isUser ? s.userRow : s.assistantRow]}>
         <View
           style={[
-            styles.bubble,
-            isUser ? styles.userBubble : styles.assistantBubble,
-            msg.isError && styles.errorBubble,
+            s.bubble,
+            isUser ? s.userBubble : s.assistantBubble,
+            isError && s.errorBubble,
           ]}
         >
-          <Text style={[styles.bubbleText, isUser ? styles.userBubbleText : styles.assistantBubbleText]}>
+          <Text style={[s.bubbleText, isUser ? s.userBubbleText : s.assistantBubbleText]}>
             {msg.text}
           </Text>
           {isAssistant && !msg.isWelcome && (
             <TouchableOpacity
-              style={styles.readAloudButton}
+              style={s.readAloudButton}
               onPress={() => readAloud(msg.text)}
             >
               <Ionicons
                 name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
                 size={16}
-                color="#6B7280"
+                color={colors.textSecondary}
               />
-              <Text style={styles.readAloudText}>Read aloud</Text>
+              <Text style={s.readAloudText}>Read aloud</Text>
             </TouchableOpacity>
           )}
         </View>
-        <Text style={[styles.timestamp, isUser ? styles.userTimestamp : styles.assistantTimestamp]}>
+        <Text style={[s.timestamp, isUser ? s.userTimestamp : s.assistantTimestamp]}>
           {msg.timestamp}
         </Text>
       </View>
@@ -297,46 +301,46 @@ export default function AssistantScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={s.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Assistant</Text>
-        <TouchableOpacity onPress={clearChat} style={styles.clearButton}>
-          <Ionicons name="trash-outline" size={22} color="#ef4444" />
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Assistant</Text>
+        <TouchableOpacity onPress={clearChat} style={s.clearButton}>
+          <Ionicons name="trash-outline" size={22} color={colors.danger} />
         </TouchableOpacity>
       </View>
 
       {/* Messages */}
       <ScrollView
         ref={scrollViewRef}
-        style={styles.messagesContainer}
-        contentContainerStyle={styles.messagesContent}
+        style={s.messagesContainer}
+        contentContainerStyle={s.messagesContent}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
       >
         {messages.map(renderMessageBubble)}
 
         {/* Loading indicator */}
         {isLoading && (
-          <View key="loading" style={[styles.bubbleRow, styles.assistantRow]}>
-            <View style={[styles.bubble, styles.assistantBubble, styles.loadingBubble]}>
-              <TypingDots />
+          <View key="loading" style={[s.bubbleRow, s.assistantRow]}>
+            <View style={[s.bubble, s.assistantBubble, s.loadingBubble]}>
+              <TypingDots colors={colors} />
             </View>
           </View>
         )}
 
         {/* Suggestion chips — only show before first message */}
         {!hasSentMessage && (
-          <View style={styles.suggestionsContainer}>
+          <View style={s.suggestionsContainer}>
             {SUGGESTIONS.map((suggestion, index) => (
               <TouchableOpacity
                 key={index}
-                style={styles.suggestionChip}
+                style={s.suggestionChip}
                 onPress={() => handleSuggestionTap(suggestion)}
               >
-                <Text style={styles.suggestionText}>{suggestion}</Text>
+                <Text style={s.suggestionText}>{suggestion}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -345,10 +349,10 @@ export default function AssistantScreen() {
 
       {/* Voice/Speaking status bar */}
       {(isListening || isSpeaking) && (
-        <View style={styles.voiceStatusBar}>
+        <View style={s.voiceStatusBar}>
           {isListening ? (
             <>
-              <Text style={styles.voiceStatusText}>🎙️ Listening... (tap mic to stop)</Text>
+              <Text style={s.voiceStatusText}>🎙️ Listening... (tap mic to stop)</Text>
             </>
           ) : (
             <TouchableOpacity
@@ -357,35 +361,35 @@ export default function AssistantScreen() {
                 setIsSpeaking(false);
               }}
             >
-              <Text style={styles.voiceStatusText}>🔊 Speaking... (tap to stop)</Text>
+              <Text style={s.voiceStatusText}>🔊 Speaking... (tap to stop)</Text>
             </TouchableOpacity>
           )}
         </View>
       )}
 
       {/* Input row */}
-      <View style={styles.inputContainer}>
+      <View style={s.inputContainer}>
         {voiceAvailable ? (
           <TouchableOpacity
-            style={[styles.micButton, isListening && styles.micButtonActive]}
+            style={[s.micButton, isListening && s.micButtonActive]}
             onPress={toggleListening}
           >
             <Ionicons
               name={isListening ? 'mic' : 'mic-outline'}
               size={24}
-              color={isListening ? '#ef4444' : '#6B7280'}
+              color={isListening ? colors.danger : colors.textSecondary}
             />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.micButton} disabled>
-            <Ionicons name="mic-off-outline" size={24} color="#D1D5DB" />
+          <TouchableOpacity style={s.micButton} disabled>
+            <Ionicons name="mic-off-outline" size={24} color={colors.textMuted} />
           </TouchableOpacity>
         )}
 
         <TextInput
-          style={styles.textInput}
+          style={s.textInput}
           placeholder="Ask about your spending..."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.textMuted}
           value={inputText}
           onChangeText={setInputText}
           multiline
@@ -394,29 +398,29 @@ export default function AssistantScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.sendButton, (!inputText.trim() || isLoading) && styles.sendButtonDisabled]}
+          style={[s.sendButton, (!inputText.trim() || isLoading) && s.sendButtonDisabled]}
           onPress={() => sendMessage(inputText)}
           disabled={!inputText.trim() || isLoading}
         >
           <Ionicons
             name="send"
             size={20}
-            color={!inputText.trim() || isLoading ? '#9CA3AF' : 'white'}
+            color={!inputText.trim() || isLoading ? colors.textMuted : 'white'}
           />
         </TouchableOpacity>
       </View>
 
       {!voiceAvailable && (
-        <Text style={styles.voiceNote}>Voice requires Expo Dev Build</Text>
+        <Text style={s.voiceNote}>Voice requires Expo Dev Build</Text>
       )}
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   header: {
     flexDirection: 'row',
@@ -425,14 +429,14 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.headerBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: c.border,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: c.text,
   },
   clearButton: {
     padding: 8,
@@ -460,15 +464,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   userBubble: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: c.cardBg,
     borderBottomLeftRadius: 4,
   },
   errorBubble: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: c.dangerLight,
   },
   loadingBubble: {
     paddingVertical: 14,
@@ -479,14 +483,14 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   userBubbleText: {
-    color: '#FFFFFF',
+    color: 'white',
   },
   assistantBubbleText: {
-    color: '#1F2937',
+    color: c.text,
   },
   timestamp: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: c.textMuted,
     marginTop: 4,
     marginHorizontal: 4,
   },
@@ -502,11 +506,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: c.border,
   },
   readAloudText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginLeft: 4,
   },
   typingDots: {
@@ -515,7 +519,6 @@ const styles = StyleSheet.create({
   },
   dot: {
     fontSize: 10,
-    color: '#6B7280',
     marginRight: 3,
   },
   suggestionsContainer: {
@@ -525,7 +528,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   suggestionChip: {
-    backgroundColor: '#E0F2FE',
+    backgroundColor: c.accentLight,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -534,7 +537,7 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     fontSize: 13,
-    color: '#0284C7',
+    color: c.accent,
     fontWeight: '500',
   },
   voiceStatusBar: {
@@ -542,13 +545,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: c.warningLight,
     borderTopWidth: 1,
-    borderTopColor: '#FDE68A',
+    borderTopColor: c.border,
   },
   voiceStatusText: {
     fontSize: 13,
-    color: '#92400E',
+    color: c.warning,
     fontWeight: '500',
   },
   inputContainer: {
@@ -557,8 +560,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: c.border,
+    backgroundColor: c.bg,
   },
   micButton: {
     width: 40,
@@ -570,38 +573,38 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   micButtonActive: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: c.dangerLight,
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: c.inputBg,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 100,
-    color: '#1F2937',
+    color: c.text,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
     marginBottom: 2,
   },
   sendButtonDisabled: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: c.border,
   },
   voiceNote: {
     textAlign: 'center',
     fontSize: 11,
-    color: '#9CA3AF',
+    color: c.textMuted,
     paddingBottom: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
 });

@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { getCurrentGroup, createGroup, joinGroup, leaveGroup } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { useTheme } from '../context/ThemeContext';
 
 export default function GroupScreen() {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [group, setGroup] = useState(null);
   const [members, setMembers] = useState([]);
   const [isOwner, setIsOwner] = useState(false);
@@ -129,149 +132,151 @@ export default function GroupScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading group information...</Text>
+      <View style={s.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={s.loadingText}>Loading group information...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={48} color="red" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadGroup}>
-          <Text style={styles.retryButtonText}>Retry</Text>
+      <View style={s.errorContainer}>
+        <Ionicons name="alert-circle" size={48} color={colors.danger} />
+        <Text style={s.errorText}>{error}</Text>
+        <TouchableOpacity style={s.retryButton} onPress={loadGroup}>
+          <Text style={s.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={s.container}>
       {!group ? (
-        <View style={styles.noGroupContainer}>
-          <Ionicons name="people-outline" size={64} color="#ccc" />
-          <Text style={styles.noGroupText}>You're not in a group yet</Text>
-          <Text style={styles.noGroupSubtext}>Create a group or join an existing one to share expenses with family</Text>
+        <View style={s.noGroupContainer}>
+          <Ionicons name="people-outline" size={64} color={colors.textMuted} />
+          <Text style={s.noGroupText}>You're not in a group yet</Text>
+          <Text style={s.noGroupSubtext}>Create a group or join an existing one to share expenses with family</Text>
 
-          <View style={styles.buttonContainer}>
+          <View style={s.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.createButton]}
+              style={[s.button, s.createButton]}
               onPress={() => {
                 setShowCreateForm(true);
                 setShowJoinForm(false);
               }}
             >
               <Ionicons name="add" size={20} color="white" />
-              <Text style={styles.buttonText}>Create Group</Text>
+              <Text style={s.buttonText}>Create Group</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.button, styles.joinButton]}
+              style={[s.button, s.joinButton]}
               onPress={() => {
                 setShowJoinForm(true);
                 setShowCreateForm(false);
               }}
             >
               <Ionicons name="enter" size={20} color="white" />
-              <Text style={styles.buttonText}>Join Group</Text>
+              <Text style={s.buttonText}>Join Group</Text>
             </TouchableOpacity>
           </View>
 
           {showCreateForm && (
-            <View style={styles.formContainer}>
-              <Text style={styles.formTitle}>Create New Group</Text>
+            <View style={s.formContainer}>
+              <Text style={s.formTitle}>Create New Group</Text>
               <TextInput
-                style={styles.input}
+                style={s.input}
                 placeholder="Group Name (e.g., Family Expenses)"
                 value={groupName}
                 onChangeText={setGroupName}
+                placeholderTextColor={colors.textMuted}
               />
-              <View style={styles.formButtons}>
+              <View style={s.formButtons}>
                 <TouchableOpacity
-                  style={[styles.formButton, styles.cancelButton]}
+                  style={[s.formButton, s.cancelButton]}
                   onPress={() => setShowCreateForm(false)}
                 >
-                  <Text style={styles.formButtonText}>Cancel</Text>
+                  <Text style={s.formButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.formButton, styles.submitButton]}
+                  style={[s.formButton, s.submitButton]}
                   onPress={handleCreateGroup}
                   disabled={isLoading}
                 >
-                  <Text style={styles.formButtonText}>{isLoading ? 'Creating...' : 'Create'}</Text>
+                  <Text style={s.formButtonText}>{isLoading ? 'Creating...' : 'Create'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
           {showJoinForm && (
-            <View style={styles.formContainer}>
-              <Text style={styles.formTitle}>Join Existing Group</Text>
+            <View style={s.formContainer}>
+              <Text style={s.formTitle}>Join Existing Group</Text>
               <TextInput
-                style={styles.input}
+                style={s.input}
                 placeholder="Invite Code (e.g., ABC123)"
                 value={inviteCode}
                 onChangeText={setInviteCode}
                 autoCapitalize="characters"
+                placeholderTextColor={colors.textMuted}
               />
-              <View style={styles.formButtons}>
+              <View style={s.formButtons}>
                 <TouchableOpacity
-                  style={[styles.formButton, styles.cancelButton]}
+                  style={[s.formButton, s.cancelButton]}
                   onPress={() => setShowJoinForm(false)}
                 >
-                  <Text style={styles.formButtonText}>Cancel</Text>
+                  <Text style={s.formButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.formButton, styles.submitButton]}
+                  style={[s.formButton, s.submitButton]}
                   onPress={handleJoinGroup}
                   disabled={isLoading}
                 >
-                  <Text style={styles.formButtonText}>{isLoading ? 'Joining...' : 'Join'}</Text>
+                  <Text style={s.formButtonText}>{isLoading ? 'Joining...' : 'Join'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
         </View>
       ) : (
-        <View style={styles.groupContainer}>
-          <View style={styles.groupHeader}>
-            <Text style={styles.groupName}>{group.name}</Text>
-            {isOwner && <Text style={styles.ownerBadge}>Owner</Text>}
+        <View style={s.groupContainer}>
+          <View style={s.groupHeader}>
+            <Text style={s.groupName}>{group.name}</Text>
+            {isOwner && <View style={s.ownerBadge}><Text style={s.ownerBadgeText}>Owner</Text></View>}
           </View>
 
-          <View style={styles.inviteCodeContainer}>
-            <Text style={styles.inviteCodeLabel}>Invite Code</Text>
-            <View style={styles.inviteCodeDisplay}>
-              <Text style={styles.inviteCodeText}>{group.invite_code}</Text>
-              <TouchableOpacity onPress={copyInviteCode} style={styles.copyButton}>
-                <Ionicons name="copy" size={20} color="#4CAF50" />
+          <View style={s.inviteCodeContainer}>
+            <Text style={s.inviteCodeLabel}>Invite Code</Text>
+            <View style={s.inviteCodeDisplay}>
+              <Text style={s.inviteCodeText}>{group.invite_code}</Text>
+              <TouchableOpacity onPress={copyInviteCode} style={s.copyButton}>
+                <Ionicons name="copy" size={20} color={colors.accent} />
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Group Members</Text>
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Group Members</Text>
             {members.map((member, index) => (
-              <View key={index} style={styles.memberItem}>
-                <Text style={styles.memberName}>{member.display_name}</Text>
+              <View key={index} style={s.memberItem}>
+                <Text style={s.memberName}>{member.display_name}</Text>
                 {member.id === 'current-user' && (
-                  <Text style={styles.youBadge}>You</Text>
+                  <View style={s.youBadge}><Text style={s.youBadgeText}>You</Text></View>
                 )}
               </View>
             ))}
           </View>
 
-          <View style={styles.leaveButtonContainer}>
+          <View style={s.leaveButtonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.leaveButton]}
+              style={[s.button, s.leaveButton]}
               onPress={handleLeaveGroup}
               disabled={isLoading}
             >
               <Ionicons name="exit" size={20} color="white" />
-              <Text style={styles.buttonText}>{isLoading ? 'Leaving...' : 'Leave Group'}</Text>
+              <Text style={s.buttonText}>{isLoading ? 'Leaving...' : 'Leave Group'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -280,34 +285,36 @@ export default function GroupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: c.bg,
   },
   loadingText: {
     marginTop: 15,
-    color: '#666',
+    color: c.textSecondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: c.bg,
   },
   errorText: {
-    color: 'red',
+    color: c.danger,
     fontSize: 16,
     margin: 20,
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     padding: 12,
     borderRadius: 8,
     paddingHorizontal: 24,
@@ -324,13 +331,13 @@ const styles = StyleSheet.create({
   },
   noGroupText: {
     fontSize: 20,
-    color: '#666',
+    color: c.textSecondary,
     marginTop: 20,
     fontWeight: '600',
   },
   noGroupSubtext: {
     fontSize: 16,
-    color: '#999',
+    color: c.textMuted,
     marginTop: 10,
     textAlign: 'center',
     marginBottom: 30,
@@ -348,13 +355,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   createButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
   },
   joinButton: {
     backgroundColor: '#2196F3',
   },
   leaveButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: c.danger,
   },
   buttonText: {
     color: 'white',
@@ -364,11 +371,11 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
-    backgroundColor: 'white',
+    backgroundColor: c.cardBg,
     padding: 20,
     borderRadius: 12,
     marginTop: 20,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -378,17 +385,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
+    color: c.text,
   },
   input: {
     height: 50,
-    borderColor: '#ddd',
+    borderColor: c.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 15,
     fontSize: 16,
     marginBottom: 15,
-    backgroundColor: '#fff',
+    backgroundColor: c.inputBg,
+    color: c.text,
   },
   formButtons: {
     flexDirection: 'row',
@@ -402,10 +410,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   cancelButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: c.border,
   },
   submitButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
   },
   formButtonText: {
     color: 'white',
@@ -422,23 +430,26 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
   },
   ownerBadge: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    padding: 5,
+    backgroundColor: c.accent,
     borderRadius: 10,
-    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     marginLeft: 10,
-    overflow: 'hidden',
+  },
+  ownerBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
   inviteCodeContainer: {
-    backgroundColor: 'white',
+    backgroundColor: c.cardBg,
     padding: 20,
     borderRadius: 12,
     marginBottom: 20,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -446,7 +457,7 @@ const styles = StyleSheet.create({
   },
   inviteCodeLabel: {
     fontSize: 16,
-    color: '#666',
+    color: c.textSecondary,
     marginBottom: 10,
   },
   inviteCodeDisplay: {
@@ -457,18 +468,18 @@ const styles = StyleSheet.create({
   inviteCodeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
     letterSpacing: 2,
   },
   copyButton: {
     padding: 10,
   },
   section: {
-    backgroundColor: 'white',
+    backgroundColor: c.cardBg,
     padding: 20,
     borderRadius: 12,
     marginBottom: 20,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -478,7 +489,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
+    color: c.text,
   },
   memberItem: {
     flexDirection: 'row',
@@ -486,19 +497,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: c.borderLight,
   },
   memberName: {
     fontSize: 16,
-    color: '#333',
+    color: c.text,
   },
   youBadge: {
     backgroundColor: '#2196F3',
-    color: 'white',
-    padding: 3,
     borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  youBadgeText: {
+    color: 'white',
     fontSize: 12,
-    overflow: 'hidden',
+    fontWeight: '600',
   },
   leaveButtonContainer: {
     marginTop: 20,

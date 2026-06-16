@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useTheme } from '../context/ThemeContext';
 
 export default function ScanScreen() {
   const navigation = useNavigation();
@@ -12,6 +13,8 @@ export default function ScanScreen() {
   const [isScanning, setIsScanning] = useState(false);
   const [photoTaken, setPhotoTaken] = useState(false);
   const cameraRef = useRef(null);
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (isFocused) {
@@ -66,24 +69,24 @@ export default function ScanScreen() {
 
   // Still determining permission status
   if (!permission) {
-    return <View style={styles.container} />;
+    return <View style={[s.container, { backgroundColor: colors.bg }]} />;
   }
 
   // Permission not granted yet — show request screen
   if (!permission.granted) {
     return (
-      <View style={styles.container}>
-        <View style={styles.permissionPrompt}>
-          <Ionicons name="camera" size={64} color="#666" />
-          <Text style={styles.permissionTitle}>Camera Access Needed</Text>
-          <Text style={styles.permissionText}>
+      <View style={[s.container, { backgroundColor: colors.bg }]}>
+        <View style={s.permissionPrompt}>
+          <Ionicons name="camera" size={64} color={colors.textSecondary} />
+          <Text style={s.permissionTitle}>Camera Access Needed</Text>
+          <Text style={s.permissionText}>
             Allow camera access to scan receipts. Your photos won't be shared without your permission.
           </Text>
-          <TouchableOpacity style={styles.button} onPress={requestPermission}>
-            <Text style={styles.buttonText}>Grant Permission</Text>
+          <TouchableOpacity style={s.button} onPress={requestPermission}>
+            <Text style={s.buttonText}>Grant Permission</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.galleryLink} onPress={pickImage}>
-            <Text style={styles.galleryLinkText}>Or pick from gallery</Text>
+          <TouchableOpacity style={s.galleryLink} onPress={pickImage}>
+            <Text style={s.galleryLinkText}>Or pick from gallery</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -91,62 +94,62 @@ export default function ScanScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={s.container}>
       {photoTaken ? (
-        <View style={styles.cameraCover} />
+        <View style={s.cameraCover} />
       ) : (
         <CameraView
-          style={styles.camera}
+          style={s.camera}
           facing={facing}
           ref={cameraRef}
         />
       )}
 
       {/* Overlay UI rendered on top of CameraView, not inside it */}
-      <View style={styles.overlay} pointerEvents="box-none">
-        <View style={styles.cameraHeader}>
-          <Text style={styles.cameraTitle}>Scan Receipt</Text>
+      <View style={s.overlay} pointerEvents="box-none">
+        <View style={s.cameraHeader}>
+          <Text style={s.cameraTitle}>Scan Receipt</Text>
           <TouchableOpacity
-            style={styles.flipButton}
+            style={s.flipButton}
             onPress={toggleFacing}
           >
             <Ionicons name="camera-reverse" size={24} color="white" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.cameraFrame}>
-          <View style={styles.cornerTopLeft} />
-          <View style={styles.cornerTopRight} />
-          <View style={styles.cornerBottomLeft} />
-          <View style={styles.cornerBottomRight} />
+        <View style={s.cameraFrame}>
+          <View style={s.cornerTopLeft} />
+          <View style={s.cornerTopRight} />
+          <View style={s.cornerBottomLeft} />
+          <View style={s.cornerBottomRight} />
         </View>
 
-        <View style={styles.cameraControls}>
-          <TouchableOpacity style={styles.galleryButton} onPress={pickImage} disabled={isScanning}>
+        <View style={s.cameraControls}>
+          <TouchableOpacity style={s.galleryButton} onPress={pickImage} disabled={isScanning}>
             <Ionicons name="images" size={28} color="white" />
-            <Text style={styles.galleryText}>Gallery</Text>
+            <Text style={s.galleryText}>Gallery</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.captureButton}
+            style={s.captureButton}
             onPress={takePicture}
             disabled={isScanning}
           >
             {isScanning ? (
               <ActivityIndicator size="large" color="white" />
             ) : (
-              <View style={styles.captureButtonInner} />
+              <View style={s.captureButtonInner} />
             )}
           </TouchableOpacity>
 
-          <View style={styles.placeholderButton} />
+          <View style={s.placeholderButton} />
         </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -167,18 +170,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 30,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: c.bg,
   },
   permissionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: c.text,
     marginTop: 20,
     marginBottom: 10,
   },
   permissionText: {
     fontSize: 16,
-    color: '#666',
+    color: c.textSecondary,
     textAlign: 'center',
     marginBottom: 30,
     lineHeight: 22,
@@ -213,7 +216,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderColor: '#4CAF50',
+    borderColor: c.accent,
   },
   cornerTopRight: {
     position: 'absolute',
@@ -223,7 +226,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderColor: '#4CAF50',
+    borderColor: c.accent,
   },
   cornerBottomLeft: {
     position: 'absolute',
@@ -233,7 +236,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderColor: '#4CAF50',
+    borderColor: c.accent,
   },
   cornerBottomRight: {
     position: 'absolute',
@@ -243,7 +246,7 @@ const styles = StyleSheet.create({
     height: 30,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderColor: '#4CAF50',
+    borderColor: c.accent,
   },
   cameraControls: {
     flexDirection: 'row',
@@ -268,20 +271,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: '#ccc',
+    borderColor: c.border,
   },
   captureButtonInner: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
   },
   placeholderButton: {
     width: 70,
     height: 70,
   },
   button: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     padding: 15,
     borderRadius: 8,
     margin: 20,
@@ -296,7 +299,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   galleryLinkText: {
-    color: '#4CAF50',
+    color: c.accent,
     fontSize: 16,
   },
 });

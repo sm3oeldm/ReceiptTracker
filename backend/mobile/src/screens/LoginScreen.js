@@ -1,12 +1,15 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useContext(AuthContext);
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -35,47 +38,48 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={s.container}
     >
-      <View style={styles.innerContainer}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
+      <View style={s.innerContainer}>
+        <Text style={s.title}>Welcome Back</Text>
+        <Text style={s.subtitle}>Sign in to your account</Text>
 
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email</Text>
+        <View style={s.inputContainer}>
+          <Text style={s.label}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             placeholder="your@email.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCompleteType="email"
+            placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
+        <View style={s.inputContainer}>
+          <Text style={s.label}>Password</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             placeholder="••••••••"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
             autoCapitalize="none"
             autoCompleteType="password"
+            placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={isLoading}>
-          <Text style={styles.buttonText}>{isLoading ? 'Signing In...' : 'Sign In'}</Text>
+        <TouchableOpacity style={s.button} onPress={handleLogin} disabled={isLoading}>
+          <Text style={s.buttonText}>{isLoading ? 'Signing In...' : 'Sign In'}</Text>
         </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
+        <View style={s.footer}>
+          <Text style={s.footerText}>Don't have an account?</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.footerLink}>Sign Up</Text>
+            <Text style={s.footerLink}>Sign Up</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -83,9 +87,10 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: c.bg,
   },
   innerContainer: {
     flex: 1,
@@ -96,17 +101,17 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: c.text,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: c.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
   },
   errorText: {
-    color: 'red',
+    color: c.danger,
     textAlign: 'center',
     marginBottom: 15,
   },
@@ -116,19 +121,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     marginBottom: 8,
-    color: '#333',
+    color: c.text,
   },
   input: {
     height: 50,
-    borderColor: '#ddd',
+    borderColor: c.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 15,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: c.inputBg,
+    color: c.text,
   },
   button: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
@@ -145,11 +151,11 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   footerText: {
-    color: '#666',
+    color: c.textSecondary,
     marginRight: 5,
   },
   footerLink: {
-    color: '#4CAF50',
+    color: c.accent,
     fontWeight: 'bold',
   },
 });

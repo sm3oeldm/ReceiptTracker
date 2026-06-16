@@ -1,6 +1,7 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -9,6 +10,8 @@ export default function RegisterScreen({ navigation }) {
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useContext(AuthContext);
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const handleRegister = async () => {
     if (!email || !password || !displayName) {
@@ -47,71 +50,74 @@ export default function RegisterScreen({ navigation }) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={s.container}
     >
-      <View style={styles.innerContainer}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join Receipt Tracker</Text>
+      <View style={s.innerContainer}>
+        <Text style={s.title}>Create Account</Text>
+        <Text style={s.subtitle}>Join Receipt Tracker</Text>
 
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Display Name</Text>
+        <View style={s.inputContainer}>
+          <Text style={s.label}>Display Name</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             placeholder="Your Name"
             value={displayName}
             onChangeText={setDisplayName}
             autoCapitalize="words"
+            placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email</Text>
+        <View style={s.inputContainer}>
+          <Text style={s.label}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             placeholder="your@email.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCompleteType="email"
+            placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
+        <View style={s.inputContainer}>
+          <Text style={s.label}>Password</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             placeholder="•••••••• (min 8 characters)"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
             autoCapitalize="none"
             autoCompleteType="password"
+            placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Confirm Password</Text>
+        <View style={s.inputContainer}>
+          <Text style={s.label}>Confirm Password</Text>
           <TextInput
-            style={styles.input}
+            style={s.input}
             placeholder="••••••••"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
             autoCapitalize="none"
             autoCompleteType="password"
+            placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={isLoading}>
-          <Text style={styles.buttonText}>{isLoading ? 'Registering...' : 'Register'}</Text>
+        <TouchableOpacity style={s.button} onPress={handleRegister} disabled={isLoading}>
+          <Text style={s.buttonText}>{isLoading ? 'Registering...' : 'Register'}</Text>
         </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account?</Text>
+        <View style={s.footer}>
+          <Text style={s.footerText}>Already have an account?</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.footerLink}>Sign In</Text>
+            <Text style={s.footerLink}>Sign In</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -119,9 +125,10 @@ export default function RegisterScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: c.bg,
   },
   innerContainer: {
     flex: 1,
@@ -132,17 +139,17 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: c.text,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: c.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
   },
   errorText: {
-    color: 'red',
+    color: c.danger,
     textAlign: 'center',
     marginBottom: 15,
   },
@@ -152,19 +159,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     marginBottom: 8,
-    color: '#333',
+    color: c.text,
   },
   input: {
     height: 50,
-    borderColor: '#ddd',
+    borderColor: c.inputBorder,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 15,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: c.inputBg,
+    color: c.text,
   },
   button: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: c.accent,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
@@ -181,11 +189,11 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   footerText: {
-    color: '#666',
+    color: c.textSecondary,
     marginRight: 5,
   },
   footerLink: {
-    color: '#4CAF50',
+    color: c.accent,
     fontWeight: 'bold',
   },
 });
