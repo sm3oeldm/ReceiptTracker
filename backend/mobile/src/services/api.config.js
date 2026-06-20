@@ -10,8 +10,8 @@ import { Platform } from 'react-native';
 
 const DEV_API_HOST = Platform.select({
   android: '10.0.2.2',
-  ios: '192.168.0.130',
-  default: '192.168.0.130',
+  ios: '192.168.0.132',
+  default: '192.168.0.132',
 });
 const API_PORT = '3000';
 

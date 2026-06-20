@@ -1,10 +1,23 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  ActivityIndicator, Platform,
+} from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { getReport } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { BarChart } from 'react-native-chart-kit';
 import { useTheme } from '../context/ThemeContext';
+import { Dimensions } from 'react-native';
+import { SPACING, RADIUS, FONT, SHADOW } from '../constants/design';
+
+const { width: screenWidth } = Dimensions.get('window');
+const CHART_WIDTH = Math.min(screenWidth - SPACING.xl * 2 - SPACING.xl * 2, 400);
+
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 export default function ReportScreen() {
   const navigation = useNavigation();
@@ -16,8 +29,9 @@ export default function ReportScreen() {
   const [error, setError] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [totalWidth, setTotalWidth] = useState(0);
 
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -29,468 +43,475 @@ export default function ReportScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedMonth, selectedYear]);
 
   useEffect(() => {
     loadReport();
-  }, [selectedMonth, selectedYear, isFocused]);
+  }, [loadReport, isFocused]);
 
   const changeMonth = (direction) => {
     let newMonth = selectedMonth + direction;
     let newYear = selectedYear;
-
-    if (newMonth < 0) {
-      newMonth = 11;
-      newYear--;
-    } else if (newMonth > 11) {
-      newMonth = 0;
-      newYear++;
-    }
-
+    if (newMonth < 0) { newMonth = 11; newYear--; }
+    else if (newMonth > 11) { newMonth = 0; newYear++; }
     setSelectedMonth(newMonth);
     setSelectedYear(newYear);
   };
 
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                     'July', 'August', 'September', 'October', 'November', 'December'];
-
+  // ── Loading ──
   if (isLoading) {
     return (
-      <View style={s.loadingContainer}>
+      <View style={s.centerContainer}>
         <ActivityIndicator size="large" color={colors.accent} />
         <Text style={s.loadingText}>Generating report...</Text>
       </View>
     );
   }
 
+  // ── Error ──
   if (error) {
     const isAuthError = error.includes('Invalid or expired token') || error.includes('No token provided');
     const isNoGroup = error.includes('not in a group');
     return (
-      <View style={s.errorContainer}>
-        <Ionicons name={isAuthError ? 'lock-closed' : isNoGroup ? 'people-outline' : 'alert-circle'} size={48} color={isAuthError ? colors.textMuted : colors.danger} />
-        <Text style={s.errorTitle}>
-          {isAuthError ? 'Session Expired' : isNoGroup ? 'No Group Yet' : 'Something went wrong'}
-        </Text>
-        <Text style={s.errorText}>
-          {isAuthError ? 'Please log in again to continue' : isNoGroup ? 'Create or join a group to see shared reports' : error}
-        </Text>
-        {!isAuthError && !isNoGroup && (
-          <TouchableOpacity style={s.retryButton} onPress={loadReport}>
-            <Ionicons name="refresh" size={18} color="white" />
-            <Text style={s.retryButtonText}>  Try Again</Text>
-          </TouchableOpacity>
-        )}
-        {isNoGroup && (
-          <TouchableOpacity
-            style={s.retryButton}
-            onPress={() => navigation.navigate('Group')}
-          >
-            <Ionicons name="people" size={18} color="white" />
-            <Text style={s.retryButtonText}>  Go to Groups</Text>
-          </TouchableOpacity>
-        )}
+      <View style={s.centerContainer}>
+        <View style={[s.statusCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Ionicons
+            name={isAuthError ? 'lock-closed-outline' : isNoGroup ? 'people-outline' : 'alert-circle-outline'}
+            size={48}
+            color={isAuthError ? colors.textMuted : colors.danger}
+          />
+          <Text style={s.statusTitle}>
+            {isAuthError ? 'Session Expired' : isNoGroup ? 'No Group Yet' : 'Something went wrong'}
+          </Text>
+          <Text style={s.statusSubtext}>
+            {isAuthError ? 'Please log in again' : isNoGroup ? 'Create or join a group to see shared reports' : error}
+          </Text>
+          {!isAuthError && !isNoGroup && (
+            <TouchableOpacity style={s.primaryButton} onPress={loadReport}>
+              <Ionicons name="refresh" size={18} color="#FFFFFF" />
+              <Text style={s.primaryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          )}
+          {isNoGroup && (
+            <TouchableOpacity style={s.primaryButton} onPress={() => navigation.navigate('Group')}>
+              <Ionicons name="people-outline" size={18} color="#FFFFFF" />
+              <Text style={s.primaryButtonText}>Go to Groups</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   }
 
-  if (!report || !report.summary) {
-    return (
-      <View style={s.emptyContainer}>
-        <Ionicons name="stats-chart-outline" size={80} color={colors.textMuted} />
-        <Text style={s.emptyTitle}>No data available</Text>
-        <Text style={s.emptySubtext}>Start adding receipts to see your spending reports</Text>
-        <TouchableOpacity
-          style={s.primaryButton}
-          onPress={() => navigation.navigate('Scan')}
-        >
-          <Ionicons name="camera" size={20} color="white" />
-          <Text style={s.primaryButtonText}>Take a Photo</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const hasData = report?.summary?.receipt_count > 0;
 
-  // Check if there's any actual data
-  const hasData = report.summary.receipt_count > 0;
-
+  // ── Empty state (with month nav) ──
   if (!hasData) {
     return (
       <View style={s.container}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => changeMonth(-1)} style={s.monthNav}>
+          <TouchableOpacity onPress={() => changeMonth(-1)} style={s.monthNav} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={24} color={colors.accent} />
           </TouchableOpacity>
-
-          <View style={s.monthSelector}>
-            <Text style={s.monthText}>{monthNames[selectedMonth]} {selectedYear}</Text>
-          </View>
-
-          <TouchableOpacity onPress={() => changeMonth(1)} style={s.monthNav}>
+          <Text style={s.monthText}>{monthNames[selectedMonth]} {selectedYear}</Text>
+          <TouchableOpacity onPress={() => changeMonth(1)} style={s.monthNav} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-forward" size={24} color={colors.accent} />
           </TouchableOpacity>
         </View>
 
-        <View style={s.emptyContainer}>
-          <Ionicons name="receipt-outline" size={80} color={colors.textMuted} />
-          <Text style={s.emptyTitle}>No receipts this month</Text>
-          <Text style={s.emptySubtext}>
-            Receipts you and your group members scan will show up here
-          </Text>
-          <TouchableOpacity
-            style={s.primaryButton}
-            onPress={() => navigation.navigate('Scan')}
-          >
-            <Ionicons name="camera" size={20} color="white" />
-            <Text style={s.primaryButtonText}>Scan a Receipt</Text>
-          </TouchableOpacity>
+        <View style={s.centerContainer}>
+          <View style={[s.statusCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <Ionicons name="receipt-outline" size={48} color={colors.textMuted} />
+            <Text style={s.statusTitle}>No receipts this month</Text>
+            <Text style={s.statusSubtext}>
+              Receipts you and your group members scan will show up here
+            </Text>
+            <TouchableOpacity style={s.primaryButton} onPress={() => navigation.navigate('Scan')}>
+              <Ionicons name="camera-outline" size={18} color="#FFFFFF" />
+              <Text style={s.primaryButtonText}>Scan a Receipt</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
   }
 
-  // Prepare data for trend chart
+  // Chart data
   const trendData = {
-    labels: report.trend.map(item => item.month.substring(5)),
-    datasets: [
-      {
-        data: report.trend.map(item => item.total)
-      }
-    ]
+    labels: report.trend.map((item) => item.month.substring(5)),
+    datasets: [{ data: report.trend.map((item) => item.total) }],
   };
 
   return (
-    <ScrollView style={s.container}>
+    <View style={s.container}>
+      {/* Header with month picker */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => changeMonth(-1)} style={s.monthNav}>
+        <TouchableOpacity onPress={() => changeMonth(-1)} style={s.monthNav} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={24} color={colors.accent} />
         </TouchableOpacity>
-
-        <View style={s.monthSelector}>
-          <Text style={s.monthText}>{monthNames[selectedMonth]} {selectedYear}</Text>
-        </View>
-
-        <TouchableOpacity onPress={() => changeMonth(1)} style={s.monthNav}>
+        <Text style={s.monthText}>{monthNames[selectedMonth]} {selectedYear}</Text>
+        <TouchableOpacity onPress={() => changeMonth(1)} style={s.monthNav} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-forward" size={24} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
-      <View style={s.summaryCard}>
-        <Text style={s.summaryTitle}>Monthly Summary</Text>
-        <Text style={s.summaryAmount}>AED {report.summary.total_spent.toFixed(2)}</Text>
-        <Text style={s.summaryCount}>{report.summary.receipt_count} receipts</Text>
-      </View>
-
-      <View style={s.section}>
-        <Text style={s.sectionTitle}>Spending Trend</Text>
-        <View style={s.chartContainer}>
-          <BarChart
-            data={trendData}
-            width={350}
-            height={220}
-            yAxisLabel="AED "
-            chartConfig={{
-              backgroundColor: colors.cardBg,
-              backgroundGradientFrom: colors.cardBg,
-              backgroundGradientTo: colors.cardBg,
-              decimalPlaces: 0,
-              color: () => colors.accent,
-              labelColor: () => colors.textSecondary,
-              style: {
-                borderRadius: 16,
-              },
-              propsForDots: {
-                r: '6',
-                strokeWidth: '2',
-                stroke: colors.cardBg,
-              },
-            }}
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-            }}
-          />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Summary card - refined */}
+        <View style={[s.summaryCard, { backgroundColor: colors.accent }]}>
+          <Text style={s.summaryTitle}>Monthly Summary</Text>
+          <Text style={s.summaryAmount}>AED {report.summary.total_spent.toFixed(2)}</Text>
+          <View style={s.summaryMeta}>
+            <View style={s.summaryMetaItem}>
+              <Ionicons name="receipt-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={s.summaryMetaText}>{report.summary.receipt_count} receipts</Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      <View style={s.section}>
-        <Text style={s.sectionTitle}>By Category</Text>
-        {report.by_category && report.by_category.length > 0 ? (
-          report.by_category.map((category, index) => (
-            <View key={index} style={s.categoryItem}>
-              <View style={s.categoryInfo}>
-                <Text style={s.categoryIcon}>{category.icon}</Text>
-                <Text style={s.categoryName}>{category.category_name}</Text>
+        {/* Spending Trend */}
+        <View style={[s.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={s.sectionHeader}>
+            <Ionicons name="trending-up-outline" size={16} color={colors.text} />
+            <Text style={s.sectionTitle}>Spending Trend</Text>
+          </View>
+          <View style={s.chartContainer}>
+            <BarChart
+              data={trendData}
+              width={CHART_WIDTH}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              fromZero
+              showValuesOnTopOfBars
+              withInnerLines={false}
+              chartConfig={{
+                backgroundColor: colors.cardBg,
+                backgroundGradientFrom: colors.cardBg,
+                backgroundGradientTo: colors.cardBg,
+                decimalPlaces: 0,
+                color: () => colors.accent,
+                labelColor: () => colors.textMuted,
+                barPercentage: 0.6,
+                propsForBackgroundLines: {
+                  strokeDasharray: '4 4',
+                  stroke: colors.border,
+                },
+                propsForLabels: {
+                  fontSize: 11,
+                  fontWeight: '500',
+                },
+                style: { borderRadius: RADIUS.md },
+              }}
+              style={{ borderRadius: RADIUS.md }}
+            />
+          </View>
+        </View>
+
+        {/* By Category */}
+        <View style={[s.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={s.sectionHeader}>
+            <Ionicons name="layers-outline" size={16} color={colors.text} />
+            <Text style={s.sectionTitle}>By Category</Text>
+          </View>
+          {report.by_category && report.by_category.length > 0 ? (
+            report.by_category.map((category, index) => (
+              <View key={index} style={[s.row, index === report.by_category.length - 1 && { borderBottomWidth: 0 }]}>
+                <View style={s.rowLeft}>
+                  <Text style={s.rowIcon}>{category.icon}</Text>
+                  <Text style={s.rowName}>{category.category_name}</Text>
+                </View>
+                <View style={s.rowRight}>
+                  <Text style={s.rowAmount}>AED {category.total.toFixed(2)}</Text>
+                  <Text style={s.rowPercentage}>{category.percentage}%</Text>
+                </View>
               </View>
-              <View style={s.categoryStats}>
-                <Text style={s.categoryAmount}>AED {category.total.toFixed(2)}</Text>
-                <Text style={s.categoryPercentage}>{category.percentage}%</Text>
+            ))
+          ) : (
+            <Text style={s.noDataText}>No categories with spending this month</Text>
+          )}
+        </View>
+
+        {/* By Member */}
+        <View style={[s.sectionCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={s.sectionHeader}>
+            <Ionicons name="people-outline" size={16} color={colors.text} />
+            <Text style={s.sectionTitle}>By Member</Text>
+          </View>
+          {report.by_member && report.by_member.length > 0 ? (
+            report.by_member.map((member, index) => (
+              <View key={index} style={[s.memberRow, index === report.by_member.length - 1 && { borderBottomWidth: 0 }]}>
+                <View style={s.memberAvatar}>
+                  <Ionicons name="person-outline" size={18} color={colors.textMuted} />
+                </View>
+                <View style={s.memberInfo}>
+                  <Text style={s.memberName}>{member.display_name}</Text>
+                  <Text style={s.memberCount}>{member.receipt_count} receipts</Text>
+                </View>
+                <Text style={s.memberAmount}>AED {member.total.toFixed(2)}</Text>
               </View>
-            </View>
-          ))
-        ) : (
-          <Text style={s.noDataText}>No categories with spending this month</Text>
-        )}
-      </View>
+            ))
+          ) : (
+            <Text style={s.noDataText}>No members with spending this month</Text>
+          )}
+        </View>
 
-      <View style={s.section}>
-        <Text style={s.sectionTitle}>By Member</Text>
-        {report.by_member && report.by_member.length > 0 ? (
-          report.by_member.map((member, index) => (
-            <View key={index} style={s.memberItem}>
-              <Text style={s.memberName}>{member.display_name}</Text>
-              <Text style={s.memberAmount}>AED {member.total.toFixed(2)}</Text>
-              <Text style={s.memberCount}>{member.receipt_count} receipts</Text>
-            </View>
-          ))
-        ) : (
-          <Text style={s.noDataText}>No members with spending this month</Text>
-        )}
-      </View>
-
-      <View style={s.exportSection}>
-        <TouchableOpacity style={s.exportButton}>
-          <Ionicons name="download" size={20} color="white" />
-          <Text style={s.exportButtonText}>Export CSV</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        {/* Export */}
+        <View style={s.exportSection}>
+          <TouchableOpacity style={s.exportButton}>
+            <Ionicons name="download-outline" size={18} color="#FFFFFF" />
+            <Text style={s.exportButtonText}>Export CSV</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const makeStyles = (c) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: c.bg,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: c.bg,
-  },
-  loadingText: {
-    marginTop: 15,
-    color: c.textSecondary,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: c.bg,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: c.text,
-    marginTop: 15,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  errorText: {
-    color: c.danger,
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    flexDirection: 'row',
-    backgroundColor: c.accent,
-    padding: 12,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: c.text,
-    marginTop: 20,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: c.textMuted,
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    backgroundColor: c.accent,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: c.headerBg,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  monthNav: {
-    padding: 10,
-  },
-  monthSelector: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  monthText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: c.text,
-  },
-  summaryCard: {
-    backgroundColor: c.accent,
-    padding: 25,
-    margin: 20,
-    borderRadius: 16,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  summaryTitle: {
-    color: 'white',
-    fontSize: 16,
-    opacity: 0.9,
-  },
-  summaryAmount: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginVertical: 8,
-  },
-  summaryCount: {
-    color: 'white',
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  section: {
-    backgroundColor: c.cardBg,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: c.text,
-  },
-  chartContainer: {
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  noDataText: {
-    fontSize: 14,
-    color: c.textMuted,
-    textAlign: 'center',
-    paddingVertical: 10,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: c.borderLight,
-  },
-  categoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  categoryIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  categoryName: {
-    fontSize: 16,
-    color: c.text,
-  },
-  categoryStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  categoryAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: c.accent,
-    marginRight: 15,
-  },
-  categoryPercentage: {
-    fontSize: 14,
-    color: c.textSecondary,
-  },
-  memberItem: {
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: c.borderLight,
-  },
-  memberName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: c.text,
-  },
-  memberAmount: {
-    fontSize: 16,
-    color: c.accent,
-    fontWeight: 'bold',
-    marginTop: 5,
-  },
-  memberCount: {
-    fontSize: 14,
-    color: c.textSecondary,
-    marginTop: 5,
-  },
-  exportSection: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  exportButton: {
-    flexDirection: 'row',
-    backgroundColor: c.accent,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  exportButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-});
+// ── Styles ──
+
+const makeStyles = (c) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.xxxl,
+      backgroundColor: c.bg,
+    },
+    loadingText: {
+      marginTop: SPACING.md,
+      fontSize: FONT.sizes.body,
+      color: c.textSecondary,
+    },
+
+    // ── Status card ──
+    statusCard: {
+      alignItems: 'center',
+      padding: SPACING.xxxl,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      gap: SPACING.sm,
+    },
+    statusTitle: {
+      fontSize: FONT.sizes.xl,
+      fontWeight: FONT.weights.bold,
+      color: c.text,
+      textAlign: 'center',
+    },
+    statusSubtext: {
+      fontSize: FONT.sizes.body,
+      color: c.textMuted,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: SPACING.sm,
+    },
+
+    // ── Header ──
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: Platform.OS === 'ios' ? 64 : 48,
+      paddingHorizontal: SPACING.xl,
+      paddingBottom: SPACING.lg,
+      backgroundColor: c.headerBg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.divider,
+    },
+    monthNav: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    monthText: {
+      fontSize: FONT.sizes.heading,
+      fontWeight: FONT.weights.bold,
+      color: c.text,
+    },
+
+    // ── Summary card ──
+    summaryCard: {
+      padding: SPACING.xxl,
+      margin: SPACING.xl,
+      borderRadius: RADIUS.lg,
+    },
+    summaryTitle: {
+      color: 'rgba(255,255,255,0.75)',
+      fontSize: FONT.sizes.body,
+      fontWeight: FONT.weights.medium,
+      letterSpacing: 0.3,
+    },
+    summaryAmount: {
+      color: '#FFFFFF',
+      fontSize: FONT.sizes.hero,
+      fontWeight: FONT.weights.heavy,
+      letterSpacing: -0.5,
+      marginVertical: SPACING.xs,
+    },
+    summaryMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.lg,
+    },
+    summaryMetaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    summaryMetaText: {
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: FONT.sizes.body,
+      fontWeight: FONT.weights.medium,
+    },
+
+    // ── Section card ──
+    sectionCard: {
+      marginHorizontal: SPACING.xl,
+      marginBottom: SPACING.md,
+      padding: SPACING.xl,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: SPACING.lg,
+    },
+    sectionTitle: {
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.semibold,
+      color: c.text,
+    },
+    chartContainer: {
+      alignItems: 'center',
+    },
+
+    // ── Category rows ──
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: SPACING.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.divider,
+    },
+    rowLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    rowIcon: {
+      fontSize: 20,
+    },
+    rowName: {
+      fontSize: FONT.sizes.body,
+      color: c.text,
+    },
+    rowRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+    },
+    rowAmount: {
+      fontSize: FONT.sizes.body,
+      fontWeight: FONT.weights.semibold,
+      color: c.accent,
+    },
+    rowPercentage: {
+      fontSize: FONT.sizes.label,
+      color: c.textMuted,
+      minWidth: 36,
+      textAlign: 'right',
+    },
+
+    // ── Member rows ──
+    memberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: SPACING.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.divider,
+      gap: SPACING.md,
+    },
+    memberAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: c.borderLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    memberInfo: {
+      flex: 1,
+    },
+    memberName: {
+      fontSize: FONT.sizes.body,
+      fontWeight: FONT.weights.semibold,
+      color: c.text,
+    },
+    memberCount: {
+      fontSize: FONT.sizes.label,
+      color: c.textMuted,
+      marginTop: 1,
+    },
+    memberAmount: {
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.bold,
+      color: c.accent,
+    },
+
+    // ── No data ──
+    noDataText: {
+      fontSize: FONT.sizes.body,
+      color: c.textMuted,
+      textAlign: 'center',
+      paddingVertical: SPACING.md,
+    },
+
+    // ── Export ──
+    exportSection: {
+      padding: SPACING.xl,
+      paddingTop: 0,
+      alignItems: 'center',
+    },
+    exportButton: {
+      flexDirection: 'row',
+      backgroundColor: c.accent,
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.xxl,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      gap: 8,
+    },
+    exportButtonText: {
+      color: '#FFFFFF',
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.semibold,
+    },
+
+    // ── Shared ──
+    primaryButton: {
+      flexDirection: 'row',
+      backgroundColor: c.accent,
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.xxl,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      gap: 8,
+      marginTop: SPACING.sm,
+    },
+    primaryButtonText: {
+      color: '#FFFFFF',
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.semibold,
+    },
+  });

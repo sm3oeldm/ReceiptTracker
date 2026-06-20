@@ -9,7 +9,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Allow Receipt Tracker to use your microphone for voice input."
+        "NSMicrophoneUsageDescription": "Allow Receipt Tracker to use your microphone for voice input.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {

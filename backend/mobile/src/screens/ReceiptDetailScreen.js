@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getReceiptById } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import { SPACING, RADIUS, FONT, SHADOW } from '../constants/design';
+
+// ── Helpers ──
 
 function daysUntil(dateString) {
   if (!dateString) return null;
@@ -19,13 +22,26 @@ function daysUntil(dateString) {
 function getBadge(days, type) {
   if (days === null) return null;
   const label = type === 'return' ? 'Return' : 'Warranty';
-  if (days < 0) return { label: `${label} Expired`, color: '#e74c3c', bg: '#FDEDED', icon: 'alert-circle' };
-  if (days === 0) return { label: `${label} Expires Today`, color: '#e67e22', bg: '#FFF3E0', icon: 'warning' };
-  if (days <= 3) return { label: `${label}: ${days} Day${days > 1 ? 's' : ''} Left`, color: '#e67e22', bg: '#FFF3E0', icon: 'warning' };
-  if (days <= 7) return { label: `${label}: ${days} Days Left`, color: '#f1c40f', bg: '#FFFDE7', icon: 'time' };
-  if (days <= 30) return { label: `${label}: ${days} Days Left`, color: '#4CAF50', bg: '#E8F5E9', icon: 'time' };
-  return { label: `${label}: ${days} Days Left`, color: '#999', bg: '#f5f5f5', icon: 'time' };
+  if (days < 0)  return { label: `${label} Expired`,     severity: 'danger'  };
+  if (days === 0) return { label: `${label} Expires Today`, severity: 'danger' };
+  if (days <= 3)  return { label: `${label}: ${days} Day${days > 1 ? 's' : ''} Left`, severity: 'orange' };
+  if (days <= 7)  return { label: `${label}: ${days} Days Left`, severity: 'amber' };
+  if (days <= 30) return { label: `${label}: ${days} Days Left`, severity: 'green' };
+  return { label: `${label}: ${days} Days Left`, severity: 'muted' };
 }
+
+function getSeverityColor(severity, colors) {
+  const map = {
+    danger:  { bg: colors.badgeRedBg,   text: colors.badgeRed,    icon: 'alert-circle' },
+    orange:  { bg: colors.badgeOrangeBg, text: colors.badgeOrange, icon: 'warning' },
+    amber:   { bg: colors.badgeAmberBg,  text: colors.badgeAmber,  icon: 'time' },
+    green:   { bg: colors.badgeGreenBg,  text: colors.badgeGreen,  icon: 'time' },
+    muted:   { bg: colors.borderLight,   text: colors.textMuted,   icon: 'time' },
+  };
+  return map[severity] || map.muted;
+}
+
+// ── Screen ──
 
 export default function ReceiptDetailScreen({ route, navigation }) {
   const { receiptId } = route.params;
@@ -60,6 +76,7 @@ export default function ReceiptDetailScreen({ route, navigation }) {
     loadReceipt();
   };
 
+  // ── Loading ──
   if (loading) {
     return (
       <View style={s.centerContainer}>
@@ -68,16 +85,19 @@ export default function ReceiptDetailScreen({ route, navigation }) {
     );
   }
 
+  // ── Error ──
   if (error) {
     return (
       <View style={s.centerContainer}>
-        <Ionicons name="alert-circle" size={64} color={colors.danger} />
-        <Text style={s.errorTitle}>Could not load receipt</Text>
-        <Text style={s.errorText}>{error}</Text>
-        <TouchableOpacity style={s.primaryButton} onPress={loadReceipt}>
-          <Ionicons name="refresh" size={18} color="white" />
-          <Text style={s.primaryButtonText}>  Try Again</Text>
-        </TouchableOpacity>
+        <View style={[s.errorCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.danger} />
+          <Text style={s.emptyTitle}>Could not load receipt</Text>
+          <Text style={s.emptySubtext}>{error}</Text>
+          <TouchableOpacity style={s.primaryButton} onPress={loadReceipt}>
+            <Ionicons name="refresh" size={18} color="#FFFFFF" />
+            <Text style={s.primaryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -89,61 +109,69 @@ export default function ReceiptDetailScreen({ route, navigation }) {
   const returnBadge = receipt.return_expiry_date ? getBadge(returnDays, 'return') : null;
   const warrantyBadge = receipt.warranty_expiry_date ? getBadge(warrantyDays, 'warranty') : null;
   const currency = receipt.currency || 'AED';
-  const hasWarrantyData = receipt.warranty_duration || receipt.warranty_expiry_date || receipt.return_period || receipt.return_expiry_date || receipt.warranty_notes;
+  const hasWarrantyData = receipt.warranty_duration || receipt.warranty_expiry_date ||
+    receipt.return_period || receipt.return_expiry_date || receipt.warranty_notes;
 
   return (
     <View style={s.container}>
+      {/* Header bar */}
       <View style={s.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Receipt Details</Text>
-        <View style={s.backBtn} />
+        <Text style={s.headerTitle}>Details</Text>
+        <View style={s.headerBtn} />
       </View>
 
       <ScrollView
         contentContainerStyle={s.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} colors={[colors.accent]} />
         }
+        showsVerticalScrollIndicator={false}
       >
-        {/* Receipt Info */}
-        <View style={s.card}>
-          <View style={s.receiptHeader}>
-            <View style={s.merchantRow}>
-              <Ionicons name="storefront" size={20} color={colors.accent} />
+        {/* ── Receipt Info Card ── */}
+        <View style={[s.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={s.merchantRow}>
+            <View style={[s.merchantIconWrap, { backgroundColor: colors.accentLight }]}>
+              <Ionicons name="storefront-outline" size={20} color={colors.accent} />
+            </View>
+            <View style={s.merchantBlock}>
               <Text style={s.merchant}>{receipt.merchant}</Text>
+              <View style={s.categoryPill}>
+                <Text style={s.categoryIcon}>{receipt.categories?.icon || '📦'}</Text>
+                <Text style={s.categoryName}>{receipt.categories?.name || 'Other'}</Text>
+              </View>
             </View>
             <Text style={s.total}>{currency} {receipt.total?.toFixed(2)}</Text>
           </View>
 
-          <View style={s.infoRow}>
-            <Ionicons name="calendar" size={16} color={colors.textSecondary} />
-            <Text style={s.infoText}>{receipt.receipt_date}</Text>
-          </View>
+          <View style={s.divider} />
 
           <View style={s.infoRow}>
-            <Text style={s.categoryLabel}>
-              {receipt.categories?.icon || '📦'} {receipt.categories?.name || 'Other'}
-            </Text>
+            <View style={s.infoItem}>
+              <Ionicons name="calendar-outline" size={15} color={colors.textMuted} />
+              <Text style={s.infoText}>{receipt.receipt_date}</Text>
+            </View>
           </View>
 
           {receipt.notes && (
             <View style={s.notesBox}>
-              <Ionicons name="information-circle" size={16} color={colors.textSecondary} />
+              <Ionicons name="information-circle-outline" size={15} color={colors.textMuted} />
               <Text style={s.notesText}>{receipt.notes}</Text>
             </View>
           )}
         </View>
 
-        {/* Items Card */}
+        {/* ── Items Card ── */}
         {receipt.items && receipt.items.length > 0 && (
-          <View style={s.card}>
-            <Text style={s.cardTitle}>
-              <Ionicons name="list" size={16} color={colors.text} /> Items
-            </Text>
+          <View style={[s.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={s.sectionHeader}>
+              <Ionicons name="list-outline" size={16} color={colors.text} />
+              <Text style={s.sectionTitle}>Items</Text>
+            </View>
             {receipt.items.map((item, idx) => (
-              <View key={idx} style={s.itemRow}>
+              <View key={idx} style={[s.itemRow, idx === receipt.items.length - 1 && { borderBottomWidth: 0 }]}>
                 <Text style={s.itemName}>{item.name}</Text>
                 <Text style={s.itemPrice}>{currency} {parseFloat(item.price).toFixed(2)}</Text>
               </View>
@@ -151,54 +179,50 @@ export default function ReceiptDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Warranty & Return Status */}
+        {/* ── Warranty & Return Card ── */}
         {hasWarrantyData && (
-          <View style={s.card}>
-            <Text style={s.cardTitle}>
-              <Ionicons name="shield-checkmark" size={16} color={colors.text} /> Warranty & Return
-            </Text>
+          <View style={[s.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={s.sectionHeader}>
+              <Ionicons name="shield-checkmark-outline" size={16} color={colors.text} />
+              <Text style={s.sectionTitle}>Warranty & Return</Text>
+            </View>
 
             {receipt.warranty_duration && (
               <View style={s.warrantyRow}>
-                <Ionicons name="shield-outline" size={16} color={colors.textSecondary} />
-                <Text style={s.warrantyRowText}>Warranty: {receipt.warranty_duration}</Text>
+                <Ionicons name="shield-outline" size={15} color={colors.textMuted} />
+                <Text style={s.warrantyText}>Warranty: {receipt.warranty_duration}</Text>
               </View>
             )}
-
             {receipt.return_period && (
               <View style={s.warrantyRow}>
-                <Ionicons name="refresh-outline" size={16} color={colors.textSecondary} />
-                <Text style={s.warrantyRowText}>Return: {receipt.return_period}</Text>
+                <Ionicons name="refresh-outline" size={15} color={colors.textMuted} />
+                <Text style={s.warrantyText}>Return: {receipt.return_period}</Text>
               </View>
             )}
 
             {returnBadge && (
-              <View style={[s.statusBadge, { backgroundColor: returnBadge.bg, marginTop: 10 }]}>
-                <Ionicons name={returnBadge.icon} size={18} color={returnBadge.color} />
-                <View style={s.statusContent}>
-                  <Text style={[s.statusLabel, { color: returnBadge.color }]}>{returnBadge.label}</Text>
-                  {receipt.return_expiry_date && (
-                    <Text style={s.statusDetail}>Return deadline: {receipt.return_expiry_date}</Text>
-                  )}
-                </View>
-              </View>
+              <StatusBlock
+                badge={returnBadge}
+                severity={returnBadge.severity}
+                colors={colors}
+                expiryDate={receipt.return_expiry_date}
+                label="Return deadline"
+              />
             )}
 
             {warrantyBadge && (
-              <View style={[s.statusBadge, { backgroundColor: warrantyBadge.bg, marginTop: 10 }]}>
-                <Ionicons name={warrantyBadge.icon} size={18} color={warrantyBadge.color} />
-                <View style={s.statusContent}>
-                  <Text style={[s.statusLabel, { color: warrantyBadge.color }]}>{warrantyBadge.label}</Text>
-                  {receipt.warranty_expiry_date && (
-                    <Text style={s.statusDetail}>Warranty expires: {receipt.warranty_expiry_date}</Text>
-                  )}
-                </View>
-              </View>
+              <StatusBlock
+                badge={warrantyBadge}
+                severity={warrantyBadge.severity}
+                colors={colors}
+                expiryDate={receipt.warranty_expiry_date}
+                label="Warranty expires"
+              />
             )}
 
             {receipt.warranty_notes && (
               <View style={s.notesBox}>
-                <Ionicons name="document-text" size={16} color={colors.textSecondary} />
+                <Ionicons name="document-text-outline" size={15} color={colors.textMuted} />
                 <Text style={s.notesText}>{receipt.warranty_notes}</Text>
               </View>
             )}
@@ -207,203 +231,271 @@ export default function ReceiptDetailScreen({ route, navigation }) {
 
         {receipt.extracted_by_gemini && (
           <View style={s.aiBadge}>
-            <Ionicons name="sparkles" size={14} color={colors.textMuted} />
+            <Ionicons name="sparkles" size={13} color={colors.textMuted} />
             <Text style={s.aiBadgeText}>Warranty info extracted by AI</Text>
           </View>
         )}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: SPACING.huge }} />
       </ScrollView>
     </View>
   );
 }
 
-const makeStyles = (c) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: c.bg,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: c.bg,
-  },
-  headerBar: {
+/** Status badge block for warranty/return expiry */
+function StatusBlock({ badge, severity, colors, expiryDate, label }) {
+  const palette = getSeverityColor(severity, colors);
+  return (
+    <View style={[statusStyles.block, { backgroundColor: palette.bg }]}>
+      <Ionicons name={palette.icon} size={18} color={palette.text} />
+      <View style={statusStyles.content}>
+        <Text style={[statusStyles.label, { color: palette.text }]}>{badge.label}</Text>
+        {expiryDate && (
+          <Text style={[statusStyles.detail, { color: colors.textMuted }]}>
+            {label}: {expiryDate}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const statusStyles = StyleSheet.create({
+  block: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: c.headerBg,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
+    padding: SPACING.md,
+    borderRadius: RADIUS.sm,
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  content: { flex: 1 },
+  label: {
+    fontSize: FONT.sizes.body,
+    fontWeight: FONT.weights.bold,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: c.text,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  card: {
-    backgroundColor: c.cardBg,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: c.text,
-    marginBottom: 12,
-  },
-  receiptHeader: {
-    marginBottom: 12,
-  },
-  merchantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  merchant: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: c.text,
-    flex: 1,
-  },
-  total: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: c.accent,
-    marginTop: 4,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
-  },
-  infoText: {
-    fontSize: 14,
-    color: c.textSecondary,
-  },
-  categoryLabel: {
-    fontSize: 14,
-    color: c.textSecondary,
-  },
-  notesBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: c.border,
-  },
-  notesText: {
-    fontSize: 14,
-    color: c.textSecondary,
-    flex: 1,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: c.borderLight,
-  },
-  itemName: {
-    fontSize: 14,
-    color: c.text,
-    flex: 1,
-  },
-  itemPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: c.textSecondary,
-    marginLeft: 10,
-  },
-  warrantyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-  },
-  warrantyRowText: {
-    fontSize: 14,
-    color: c.textSecondary,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    gap: 10,
-  },
-  statusContent: {
-    flex: 1,
-  },
-  statusLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  statusDetail: {
-    fontSize: 13,
-    color: '#666',
+  detail: {
+    fontSize: FONT.sizes.label,
     marginTop: 2,
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: c.text,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  errorText: {
-    fontSize: 16,
-    color: c.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    backgroundColor: c.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-  },
-  aiBadgeText: {
-    fontSize: 12,
-    color: c.textMuted,
-  },
 });
+
+// ── Styles ──
+
+const makeStyles = (c) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.xxxl,
+      backgroundColor: c.bg,
+    },
+    headerBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: Platform.OS === 'ios' ? 64 : 48,
+      paddingHorizontal: SPACING.lg,
+      paddingBottom: SPACING.md,
+      backgroundColor: c.headerBg,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.divider,
+    },
+    headerBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.semibold,
+      color: c.text,
+    },
+    scrollContent: {
+      padding: SPACING.lg,
+    },
+
+    // ── Error card ──
+    errorCard: {
+      alignItems: 'center',
+      padding: SPACING.xxxl,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      gap: SPACING.sm,
+    },
+    emptyTitle: {
+      fontSize: FONT.sizes.xl,
+      fontWeight: FONT.weights.bold,
+      color: c.text,
+      marginBottom: SPACING.xs,
+    },
+    emptySubtext: {
+      fontSize: FONT.sizes.body,
+      color: c.textMuted,
+      textAlign: 'center',
+      marginBottom: SPACING.xl,
+      lineHeight: 22,
+    },
+
+    // ── Card ──
+    card: {
+      borderRadius: RADIUS.lg,
+      padding: SPACING.lg,
+      marginBottom: SPACING.md,
+      borderWidth: 1,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: SPACING.md,
+    },
+    sectionTitle: {
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.semibold,
+      color: c.text,
+    },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: c.divider,
+      marginVertical: SPACING.md,
+    },
+
+    // ── Receipt header ──
+    merchantRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+    },
+    merchantIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    merchantBlock: {
+      flex: 1,
+    },
+    merchant: {
+      fontSize: FONT.sizes.xl,
+      fontWeight: FONT.weights.bold,
+      color: c.text,
+    },
+    categoryPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 2,
+    },
+    categoryIcon: {
+      fontSize: 14,
+    },
+    categoryName: {
+      fontSize: FONT.sizes.label,
+      color: c.textSecondary,
+    },
+    total: {
+      fontSize: FONT.sizes.largeTitle,
+      fontWeight: FONT.weights.bold,
+      color: c.accent,
+      letterSpacing: -0.5,
+    },
+
+    // ── Info row ──
+    infoRow: {
+      flexDirection: 'column',
+      gap: SPACING.sm,
+    },
+    infoItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    infoText: {
+      fontSize: FONT.sizes.body,
+      color: c.textSecondary,
+    },
+    notesBox: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+      marginTop: SPACING.md,
+      paddingTop: SPACING.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.divider,
+    },
+    notesText: {
+      fontSize: FONT.sizes.body,
+      color: c.textSecondary,
+      flex: 1,
+      lineHeight: 20,
+    },
+
+    // ── Items ──
+    itemRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: SPACING.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.divider,
+    },
+    itemName: {
+      fontSize: FONT.sizes.body,
+      color: c.text,
+      flex: 1,
+    },
+    itemPrice: {
+      fontSize: FONT.sizes.body,
+      fontWeight: FONT.weights.semibold,
+      color: c.textSecondary,
+      marginLeft: SPACING.sm,
+    },
+
+    // ── Warranty ──
+    warrantyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 4,
+    },
+    warrantyText: {
+      fontSize: FONT.sizes.body,
+      color: c.textSecondary,
+    },
+
+    // ── Buttons ──
+    primaryButton: {
+      flexDirection: 'row',
+      backgroundColor: c.accent,
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.xxl,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      gap: 8,
+    },
+    primaryButtonText: {
+      color: '#FFFFFF',
+      fontSize: FONT.sizes.bodyAlt,
+      fontWeight: FONT.weights.semibold,
+    },
+
+    // ── AI badge ──
+    aiBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      paddingVertical: SPACING.sm,
+    },
+    aiBadgeText: {
+      fontSize: FONT.sizes.label,
+      color: c.textMuted,
+    },
+  });
